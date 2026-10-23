@@ -1,7 +1,8 @@
-// Offline support: serve from cache immediately, refresh the cache in the background.
-// A new deploy shows up on the next app launch. Bump CACHE when adding or renaming files.
+// Offline support. App files are fetched fresh when online (falling back to the cache when
+// offline or slow), so a new deploy is picked up on the next load. Fonts are cache-first.
+// Bump CACHE when adding or renaming files.
 
-const CACHE = 'overload-v3';
+const CACHE = 'overload-v4';
 const SHELL = [
   './',
   './index.html',
@@ -34,12 +35,18 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
+  e.waitUntil((async () => {
+    const old = (await caches.keys()).filter((k) => k !== CACHE);
+    await Promise.all(old.map((k) => caches.delete(k)));
+    await self.clients.claim();
+    // An update replaced an older version: reload open tabs so they run the new code.
+    if (old.length) {
+      for (const win of await self.clients.matchAll({ type: 'window' })) win.navigate(win.url).catch(() => {});
+    }
+  })());
 });
+
+const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
@@ -48,13 +55,21 @@ self.addEventListener('fetch', (e) => {
   const fonts = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if (url.origin !== self.location.origin && !fonts) return;
 
-  const network = fetch(req).then(async (res) => {
-    if (res.ok || res.type === 'opaque') {
-      const cache = await caches.open(CACHE);
-      await cache.put(req, res.clone());
+  e.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    if (fonts) {
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
+      return res;
     }
-    return res;
-  });
-  e.respondWith(caches.match(req, { ignoreSearch: true }).then((hit) => hit || network));
-  e.waitUntil(network.then(() => {}, () => {}));
+    try {
+      const res = await Promise.race([fetch(new Request(req, { cache: 'no-cache' })), timeout(4000)]);
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    } catch {
+      return (await cache.match(req, { ignoreSearch: true })) || Response.error();
+    }
+  })());
 });

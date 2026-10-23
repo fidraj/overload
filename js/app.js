@@ -21,7 +21,7 @@ const routes = [
   [/^\/exercise-new$/, (el) => renderExerciseForm(el), 'exercises'],
   [/^\/exercise-edit\/([^/]+)$/, renderExerciseForm, 'exercises'],
   [/^\/settings$/, renderSettings, 'settings'],
-  [/^\/share\/([A-Za-z0-9_-]+)$/, renderShared, 'workout'],
+  [/^\/share\/(.+)$/, renderShared, 'workout'],
 ];
 
 const main = document.getElementById('view');
@@ -31,7 +31,7 @@ function render() {
   let match = null;
   for (const [re, view, tab] of routes) {
     const m = path.match(re);
-    if (m) { match = { view, tab, params: m.slice(1).map((p) => (p ? decodeURIComponent(p) : p)) }; break; }
+    if (m) { match = { view, tab, params: m.slice(1).map(safeDecode) }; break; }
   }
   if (!match) {
     location.replace('#/');
@@ -44,6 +44,14 @@ function render() {
     else a.removeAttribute('aria-current');
   }
   renderDock();
+}
+
+function safeDecode(p) {
+  try {
+    return p ? decodeURIComponent(p) : p;
+  } catch {
+    return p;
+  }
 }
 
 app.refresh = render;

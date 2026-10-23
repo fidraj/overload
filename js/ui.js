@@ -54,6 +54,8 @@ const ICONS = {
   back: '<path d="M15 5l-7 7 7 7"/>',
   next: '<path d="m9 5 7 7-7 7"/>',
   share: '<path d="M12 3.5v11M7.5 8 12 3.5 16.5 8M5 12.5V20h14v-7.5"/>',
+  copy: '<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5.5a1.5 1.5 0 0 0-1.5-1.5H5.5A1.5 1.5 0 0 0 4 5.5V14a1.5 1.5 0 0 0 1.5 1.5h3"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   shuffle: '<path d="M3 7h3c2 0 3.2 1 4.3 2.7l2.4 4.6c1.1 1.7 2.3 2.7 4.3 2.7h4M3 17h3c1.5 0 2.5-.6 3.4-1.6M14.1 8.6c.9-1 1.9-1.6 3.4-1.6H21M18 4l3 3-3 3M18 14l3 3-3 3"/>',
   bookmark: '<path d="M6.5 4h11v16L12 16l-5.5 4z"/>',
   trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7"/>',
@@ -201,13 +203,13 @@ export async function copyText(text) {
   }
 }
 
-export function promptSheet({ title, label, value = '', ok = 'Save' }) {
+export function promptSheet({ title, label, value = '', ok = 'Save', maxlength = 60, placeholder = '' }) {
   return new Promise((resolve) => {
     sheet({
       title,
       body: h`<form class="prompt-form">
           <label class="field"><span class="field-label">${label}</span>
-          <input class="text-in" name="v" value="${value}" maxlength="60" autocomplete="off" autofocus required></label>
+          <input class="text-in" name="v" value="${value}" maxlength="${maxlength}" placeholder="${placeholder}" autocomplete="off" autofocus required></label>
           <div class="sheet-actions">
             <button type="button" class="btn" data-no>Cancel</button>
             <button class="btn primary">${ok}</button>

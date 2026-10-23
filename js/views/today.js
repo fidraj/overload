@@ -14,7 +14,7 @@ import {
 } from '../ui.js';
 import { thumb, muscleStrip } from '../components.js';
 import { pickExercise, pickMuscles } from '../picker.js';
-import { shareWorkout } from '../share.js';
+import { shareWorkout, codeFromText } from '../share.js';
 
 const DURATIONS = [20, 30, 45, 60, 75, 90, 120];
 export const REST_OPTIONS = [0, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300];
@@ -88,7 +88,10 @@ export function renderToday(el) {
           ${icon('next')}
         </button></li>`)}</ul>` : h`
         <p class="empty-note">Tap the bookmark next to Start to save a workout you like. It shows up here, ready to repeat.</p>`}
-      <button class="btn wide" data-act="empty">${icon('plus')} Start an empty workout</button>
+      <div class="btn-col">
+        <button class="btn wide" data-act="importLink">${icon('link')} Add from a shared link</button>
+        <button class="btn wide" data-act="empty">${icon('plus')} Start an empty workout</button>
+      </div>
     </section>`);
 
   el.onclick = (e) => {
@@ -293,6 +296,14 @@ const actions = {
       save('templates');
       app.refresh();
     }
+  },
+
+  async importLink() {
+    const text = await promptSheet({ title: 'Add a shared workout', label: 'Paste the link someone sent you', ok: 'Open', maxlength: 4000, placeholder: 'https://…/#/share/…' });
+    if (!text) return;
+    const code = codeFromText(text);
+    if (code) location.hash = `#/share/${code}`;
+    else toast("That isn't a workout link. It should contain #/share/");
   },
 
   empty() {

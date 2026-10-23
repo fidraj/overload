@@ -2,7 +2,7 @@
 
 import { MUSCLES, EQUIPMENT, TRACKS } from './data.js';
 import { state, save, getEx, isCustom } from './store.js';
-import { toast, copyText, sheet, h } from './ui.js';
+import { toast, copyText, sheet, h, icon } from './ui.js';
 
 function toBase64Url(text) {
   let bin = '';
@@ -34,7 +34,8 @@ export function shareUrl(name, items) {
 export function decodeShare(code) {
   let d;
   try {
-    d = JSON.parse(fromBase64Url(code));
+    // Messaging apps sometimes add punctuation or spaces around a pasted link.
+    d = JSON.parse(fromBase64Url(String(code).replace(/[^A-Za-z0-9_-]/g, '')));
   } catch {
     return null;
   }
@@ -70,27 +71,41 @@ export function importCustom(custom) {
   save('custom');
 }
 
-export async function shareWorkout(name, items) {
+// Opens a sheet with the link and buttons to copy or send it. Copying and sharing run
+// straight from a button tap, which Safari requires.
+export function shareWorkout(name, items) {
   const url = shareUrl(name, items);
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: name, text: `${name}, a workout from Overload`, url });
-      return;
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-    }
-  }
-  if (await copyText(url)) {
-    toast('Link copied. Paste it in a message to share the workout.');
-    return;
-  }
   sheet({
-    title: 'Share link',
-    body: h`<p class="sheet-text">Copy this link and send it. Opening it shows the workout with a button to save it.</p>
-      <input class="text-in" value="${url}" readonly autofocus>`,
-    onMount(body) {
+    title: 'Share workout',
+    body: h`<p class="sheet-text">Anyone who opens this link sees "${name}" and can save it to their own workouts.</p>
+      <input class="text-in share-url" value="${url}" readonly aria-label="Link to this workout">
+      <div class="sheet-stack">
+        <button class="btn big primary" data-copy>${icon('copy')} Copy link</button>
+        ${navigator.share ? h`<button class="btn big" data-send>${icon('share')} Send with another app</button>` : ''}
+      </div>`,
+    onMount(body, close) {
       const inp = body.querySelector('input');
-      setTimeout(() => inp.select(), 50);
+      inp.addEventListener('focus', () => inp.select());
+      const copyBtn = body.querySelector('[data-copy]');
+      copyBtn.addEventListener('click', async () => {
+        if (await copyText(url)) {
+          copyBtn.innerHTML = String(h`${icon('check')} Link copied`);
+        } else {
+          inp.focus();
+          toast('Copying was blocked. The link is selected, so copy it from there.');
+        }
+      });
+      body.querySelector('[data-send]')?.addEventListener('click', () => {
+        navigator.share({ title: name, text: `${name}, a workout from Overload`, url }).then(() => close(), () => {});
+      });
     },
   });
+}
+
+// Pull the workout code out of a pasted link (or a bare code).
+export function codeFromText(text) {
+  const t = String(text).trim();
+  const m = t.match(/#\/share\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{20,}$/.test(t) ? t : null;
 }

@@ -2,7 +2,7 @@
 
 import { state, getEx } from '../store.js';
 import { estimateMinutes, saveTemplate, startWorkout } from '../engine.js';
-import { h, icon, toast } from '../ui.js';
+import { h, icon, toast, copyText } from '../ui.js';
 import { thumb } from '../components.js';
 import { decodeShare, importCustom } from '../share.js';
 import { doseText } from './today.js';
@@ -31,6 +31,10 @@ export function renderShared(el, code) {
       <h1 class="display">${d.name}</h1>
       <p class="muted">${d.items.length} exercises, ${sets} sets, about ${estimateMinutes(d.items)} min</p>
     </header>
+    ${'standalone' in navigator && !navigator.standalone ? h`<div class="card ios-note">
+      <p class="hint">Use Overload from your home screen? It keeps its own data, separate from Safari. Copy this link, open the app, then tap <b>Add from a shared link</b> under Saved workouts.</p>
+      <button class="btn small" data-act="copy">${icon('copy')} Copy link</button>
+    </div>` : ''}
     ${d.skipped ? h`<p class="hint">${d.skipped} ${d.skipped === 1 ? 'exercise' : 'exercises'} in this link aren't in your version of the app and were left out.</p>` : ''}
 
     <ul class="ex-list shared-list">${d.items.map((it) => {
@@ -47,7 +51,9 @@ export function renderShared(el, code) {
   el.onclick = (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
-    if (b.dataset.act === 'save') {
+    if (b.dataset.act === 'copy') {
+      copyText(location.href).then((ok) => toast(ok ? 'Link copied' : 'Copy the link from the address bar'));
+    } else if (b.dataset.act === 'save') {
       importCustom(d.custom);
       saveTemplate(d.name, d.items);
       toast(`"${d.name}" is in your saved workouts`);
