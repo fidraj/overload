@@ -7,6 +7,7 @@ import {
   h, icon, app, confirmSheet, promptSheet, toast, setText, dateTime, durationText, numFmt, startOfDay,
 } from '../ui.js';
 import { thumb } from '../components.js';
+import { shareWorkout } from '../share.js';
 
 const WEEKS = 12;
 
@@ -143,6 +144,7 @@ export function renderHistoryDetail(el, id, flag) {
         <button class="btn" data-act="rename">${icon('edit')} Rename</button>` : h`
         <button class="btn primary" data-act="repeat">${icon('play')} Repeat workout</button>
         <button class="btn" data-act="template">${icon('bookmark')} Save as template</button>
+        <button class="btn" data-act="share">${icon('share')} Share</button>
         <button class="btn" data-act="edit">${icon('edit')} Edit</button>
         <button class="btn ghost-danger" data-act="delete">${icon('trash')} Delete</button>`}
     </div>`);
@@ -152,7 +154,7 @@ export function renderHistoryDetail(el, id, flag) {
     if (!b) return;
     const act = b.dataset.act;
     if (act === 'repeat') {
-      if (state.active) return toast('Finish or discard your current workout first');
+      if (state.active) return toast('Finish or end your current workout first');
       startWorkout(w.exercises.map(itemFromEntry), { name: w.name, split: w.split });
       location.hash = '#/';
     } else if (act === 'template') {
@@ -160,6 +162,8 @@ export function renderHistoryDetail(el, id, flag) {
       if (!name) return;
       saveTemplate(name, w.exercises.map(itemFromEntry));
       toast(`Saved "${name}"`);
+    } else if (act === 'share') {
+      shareWorkout(w.name, w.exercises.map(itemFromEntry));
     } else if (act === 'edit') {
       editing = id;
       app.refresh();

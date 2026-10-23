@@ -1,7 +1,7 @@
 // Offline support: serve from cache immediately, refresh the cache in the background.
 // A new deploy shows up on the next app launch. Bump CACHE when adding or renaming files.
 
-const CACHE = 'overload-v2';
+const CACHE = 'overload-v3';
 const SHELL = [
   './',
   './index.html',
@@ -14,12 +14,14 @@ const SHELL = [
   './js/data.js',
   './js/engine.js',
   './js/picker.js',
+  './js/share.js',
   './js/store.js',
   './js/timer.js',
   './js/ui.js',
   './js/views/exercises.js',
   './js/views/history.js',
   './js/views/settings.js',
+  './js/views/shared.js',
   './js/views/today.js',
   './js/views/workout.js',
   './icons/icon.svg',

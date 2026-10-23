@@ -14,6 +14,7 @@ import {
 } from '../ui.js';
 import { thumb, muscleStrip } from '../components.js';
 import { pickExercise, pickMuscles } from '../picker.js';
+import { shareWorkout } from '../share.js';
 
 const DURATIONS = [20, 30, 45, 60, 75, 90, 120];
 export const REST_OPTIONS = [0, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300];
@@ -261,6 +262,7 @@ const actions = {
       title: t.name,
       options: [
         { value: 'start', label: 'Start this workout', icon: 'play' },
+        { value: 'share', label: 'Share link', desc: 'Anyone with the link can see it and save their own copy.', icon: 'share' },
         { value: 'load', label: 'Edit before starting', desc: 'Loads it in place of the generated workout.', icon: 'edit' },
         { value: 'rename', label: 'Rename', icon: 'edit' },
         { value: 'delete', label: 'Delete', icon: 'trash', danger: true },
@@ -272,6 +274,8 @@ const actions = {
       startWorkout(t.items, { name: t.name });
       window.scrollTo(0, 0);
       app.refresh();
+    } else if (v === 'share') {
+      shareWorkout(t.name, t.items);
     } else if (v === 'load') {
       Object.assign(state.draft, { title: t.name, resolved: null, items: t.items.map((it) => ({ ...it })), targets: [], edited: true });
       save('draft');

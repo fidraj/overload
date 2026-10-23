@@ -53,6 +53,7 @@ const ICONS = {
   chevron: '<path d="m7 10 5 5 5-5"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
   next: '<path d="m9 5 7 7-7 7"/>',
+  share: '<path d="M12 3.5v11M7.5 8 12 3.5 16.5 8M5 12.5V20h14v-7.5"/>',
   shuffle: '<path d="M3 7h3c2 0 3.2 1 4.3 2.7l2.4 4.6c1.1 1.7 2.3 2.7 4.3 2.7h4M3 17h3c1.5 0 2.5-.6 3.4-1.6M14.1 8.6c.9-1 1.9-1.6 3.4-1.6H21M18 4l3 3-3 3M18 14l3 3-3 3"/>',
   bookmark: '<path d="M6.5 4h11v16L12 16l-5.5 4z"/>',
   trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7"/>',
@@ -159,6 +160,45 @@ export function confirmSheet({ title, text, ok = 'Confirm', danger = false }) {
       onClose: (v) => resolve(v === true),
     });
   });
+}
+
+// Stacked buttons, first one is the main action. actions: [{ value, label, kind?: 'primary' | 'danger' }]
+// Resolves with the chosen value, or null if dismissed.
+export function actionSheet({ title, text, actions }) {
+  return new Promise((resolve) => {
+    sheet({
+      title,
+      body: h`${text ? h`<p class="sheet-text">${text}</p>` : ''}
+        <div class="sheet-stack">${actions.map((a, i) => h`
+          <button class="btn big ${a.kind === 'primary' ? 'primary' : a.kind === 'danger' ? 'ghost-danger' : ''}" data-i="${i}" ${i === 0 ? raw('autofocus') : ''}>${a.label}</button>`)}
+        </div>`,
+      onMount(body, close) {
+        body.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-i]');
+          if (b) close(actions[Number(b.dataset.i)].value);
+        });
+      },
+      onClose: (v) => resolve(v ?? null),
+    });
+  });
+}
+
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.append(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  }
 }
 
 export function promptSheet({ title, label, value = '', ok = 'Save' }) {

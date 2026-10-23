@@ -9,7 +9,7 @@ import {
 } from '../engine.js';
 import { bodyMap } from '../art.js';
 import {
-  h, raw, icon, app, choiceSheet, confirmSheet, promptSheet, toast, clock, setShort, rangeText,
+  h, raw, icon, app, choiceSheet, confirmSheet, actionSheet, promptSheet, toast, clock, setShort, rangeText,
   muscleName, listText, ago,
 } from '../ui.js';
 import { thumb } from '../components.js';
@@ -60,7 +60,7 @@ export function renderWorkout(el) {
       ${next ? h`<a class="btn primary big" href="#/workout/${next.uid}">${icon('play')} ${doneCount(next) || w.exercises.indexOf(next) ? 'Continue' : 'Begin'}: ${getEx(next.exId, next.name).name}</a>`
         : h`<button class="btn primary big" data-act="finish">${icon('check')} Finish workout</button>`}
     </div>
-    <button class="btn wide ghost-danger" data-act="discard">Discard workout</button>`);
+    <button class="btn wide ghost-danger" data-act="discard">End without saving</button>`);
 
   el.onclick = async (e) => {
     const b = e.target.closest('[data-act]');
@@ -377,7 +377,8 @@ async function workoutMenu() {
     options: [
       { value: 'rename', label: 'Rename', icon: 'edit' },
       { value: 'save', label: 'Save as workout template', icon: 'bookmark' },
-      { value: 'discard', label: 'Discard workout', icon: 'trash', danger: true },
+      { value: 'share', label: 'Share as link', icon: 'share' },
+      { value: 'discard', label: 'End without saving', icon: 'trash', danger: true },
     ],
   });
   if (v === 'rename') return commonActions('rename');
@@ -388,11 +389,19 @@ async function workoutMenu() {
     saveTemplate(name, a.exercises.map(itemFromEntry));
     toast(`Saved "${name}"`);
   }
+  if (v === 'share') {
+    if (!a.exercises.length) return toast('Add an exercise first');
+    shareWorkout(a.name, a.exercises.map(itemFromEntry));
+  }
   if (v === 'discard') discard();
 }
 
 async function discard() {
-  if (!(await confirmSheet({ title: 'Discard workout?', text: 'Nothing from this workout will be saved.', ok: 'Discard', danger: true }))) return;
+  if (!(await confirmSheet({ title: 'End without saving?', text: 'The workout closes and none of its sets go into your history.', ok: 'End without saving', danger: true }))) return;
+  endWithoutSaving();
+}
+
+function endWithoutSaving() {
   state.active = null;
   save('active');
   renderDock();
@@ -400,26 +409,60 @@ async function discard() {
   app.refresh();
 }
 
+// A set counts if it's ticked, or if every number it needs has been typed in.
+function isFilled(s, ex) {
+  return TRACKS[ex.track].fields.every((f) => s[f] != null || (f === 'w' && ex.track === 'bw'));
+}
+
 async function finish() {
-  const all = state.active.exercises.flatMap((x) => x.sets);
-  const done = all.filter((s) => s.done).length;
-  if (!done) {
-    if (await confirmSheet({ title: 'No sets logged', text: 'Tick off at least one set to save this workout. Discard it instead?', ok: 'Discard', danger: true })) {
-      state.active = null;
-      save('active');
-      renderDock();
-      location.hash = '#/';
-      app.refresh();
+  const a = state.active;
+  let ticked = 0;
+  let filled = 0;
+  let empty = 0;
+  for (const e of a.exercises) {
+    const ex = getEx(e.exId, e.name);
+    for (const s of e.sets) {
+      if (s.done) ticked++;
+      else if (isFilled(s, ex)) filled++;
+      else empty++;
     }
+  }
+
+  if (!ticked && !filled) {
+    const v = await actionSheet({
+      title: 'Nothing logged yet',
+      text: 'Enter the weight and reps for each set and tick it off as you go. Then Finish saves the workout to your history.',
+      actions: [
+        { value: 'keep', label: 'Keep going', kind: 'primary' },
+        { value: 'end', label: 'End without saving', kind: 'danger' },
+      ],
+    });
+    if (v === 'end') endWithoutSaving();
     return;
   }
-  const open = all.length - done;
-  const ok = await confirmSheet({
+
+  const total = ticked + filled;
+  const parts = [`${total} ${total === 1 ? 'set' : 'sets'} will be saved to your history.`];
+  if (filled) parts.push(`That includes ${filled} you filled in but didn't tick.`);
+  if (empty) parts.push(`${empty} empty ${empty === 1 ? 'set is' : 'sets are'} left out.`);
+  const v = await actionSheet({
     title: 'Finish workout?',
-    text: open ? `${open} unticked ${open === 1 ? 'set' : 'sets'} will be left out.` : 'Nice work. Your sets will be saved to history.',
-    ok: 'Finish',
+    text: parts.join(' '),
+    actions: [
+      { value: 'save', label: 'Finish and save', kind: 'primary' },
+      { value: 'keep', label: 'Keep going' },
+    ],
   });
-  if (!ok) return;
+  if (v !== 'save') return;
+  for (const e of a.exercises) {
+    const ex = getEx(e.exId, e.name);
+    for (const s of e.sets) {
+      if (!s.done && isFilled(s, ex)) {
+        if (s.w == null && ex.track === 'bw') s.w = 0;
+        s.done = true;
+      }
+    }
+  }
   const record = finishWorkout();
   renderDock();
   location.hash = record ? `#/history/${record.id}/done` : '#/';

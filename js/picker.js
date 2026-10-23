@@ -23,17 +23,22 @@ export function pickExercise({ title = 'Add exercise', swapFor = null, exclude =
       body: h`
         <div class="picker-tools">
           <label class="search">${icon('search')}<input type="search" data-q placeholder="Search exercises" aria-label="Search exercises" autocomplete="off"></label>
-          <div class="chip-scroll" data-muscles role="group" aria-label="Filter by muscle"></div>
-          <label class="check-line"><input type="checkbox" data-mine checked> Only exercises for my equipment</label>
+          <div class="filter-row">
+            <button class="muscle-select" data-muscle-btn aria-haspopup="dialog"></button>
+            <label class="check-line"><input type="checkbox" data-mine checked> My equipment only</label>
+          </div>
         </div>
         <ul class="picker-list" data-list></ul>`,
       onMount(body, close) {
         const list = body.querySelector('[data-list]');
-        const chips = body.querySelector('[data-muscles]');
+        const muscleBtn = body.querySelector('[data-muscle-btn]');
 
-        const drawChips = () => {
-          chips.innerHTML = String(h`${[['all', 'All'], ...Object.entries(MUSCLES).map(([k, v]) => [k, v.name])].map(([k, name]) => h`
-            <button class="chip ${k === 'all' ? '' : 'with-icon'} ${muscle === k ? 'on' : ''}" data-m="${k}" aria-pressed="${muscle === k}">${k === 'all' ? '' : h`<span class="chip-icon">${raw(muscleIcon(k))}</span>`}${name}</button>`)}`);
+        const drawMuscle = () => {
+          muscleBtn.innerHTML = String(h`
+            ${muscle === 'all' ? h`<span class="ms-icon all">${icon('dumbbell')}</span>` : h`<span class="ms-icon">${raw(muscleIcon(muscle))}</span>`}
+            <span class="ms-text"><span class="ms-k">Muscle</span><span class="ms-v">${muscle === 'all' ? 'All muscles' : muscleName(muscle)}</span></span>
+            ${icon('chevron')}`);
+          muscleBtn.setAttribute('aria-label', `Muscle filter: ${muscle === 'all' ? 'all muscles' : muscleName(muscle)}. Change`);
         };
 
         const draw = () => {
@@ -67,15 +72,40 @@ export function pickExercise({ title = 'Add exercise', swapFor = null, exclude =
 
         body.querySelector('[data-q]').addEventListener('input', (e) => { q = e.target.value; draw(); });
         body.querySelector('[data-mine]').addEventListener('change', (e) => { mine = e.target.checked; draw(); });
-        body.addEventListener('click', (e) => {
-          const m = e.target.closest('[data-m]');
-          if (m) { muscle = m.dataset.m; drawChips(); draw(); return; }
+        body.addEventListener('click', async (e) => {
+          if (e.target.closest('[data-muscle-btn]')) {
+            const m = await pickMuscle(muscle);
+            if (m) { muscle = m; drawMuscle(); draw(); list.scrollIntoView({ block: 'nearest' }); }
+            return;
+          }
           const p = e.target.closest('[data-pick]');
           if (p) close(p.dataset.pick);
         });
-        drawChips();
+        drawMuscle();
         draw();
-        chips.querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+      },
+      onClose: (v) => resolve(v || null),
+    });
+  });
+}
+
+// Single muscle, shown as a grid of body-map tiles. Resolves with a muscle key, 'all', or null.
+export function pickMuscle(current = 'all') {
+  return new Promise((resolve) => {
+    sheet({
+      title: 'Muscle',
+      body: h`<div class="muscle-grid">
+        <button class="muscle-tile ${current === 'all' ? 'on' : ''}" data-m="all" aria-pressed="${current === 'all'}">
+          <span class="mt-icon all">${icon('dumbbell')}</span><span class="mt-name">All muscles</span></button>
+        ${Object.keys(MUSCLES).map((m) => h`
+        <button class="muscle-tile ${current === m ? 'on' : ''}" data-m="${m}" aria-pressed="${current === m}">
+          <span class="mt-icon">${raw(muscleIcon(m))}</span><span class="mt-name">${muscleName(m)}</span></button>`)}
+      </div>`,
+      onMount(body, close) {
+        body.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-m]');
+          if (b) close(b.dataset.m);
+        });
       },
       onClose: (v) => resolve(v || null),
     });
@@ -90,8 +120,9 @@ export function pickMuscles({ title = 'Target muscles', selected = [] } = {}) {
       title,
       body: h`
         <p class="sheet-text">Pick the muscles you want to train. The workout is rebuilt around them.</p>
-        <div class="chip-wrap" role="group" aria-label="Muscles">${Object.keys(MUSCLES).map((m) => h`
-          <button class="chip ${sel.has(m) ? 'on' : ''}" data-m="${m}" aria-pressed="${sel.has(m)}">${muscleName(m)}</button>`)}</div>
+        <div class="muscle-grid" role="group" aria-label="Muscles">${Object.keys(MUSCLES).map((m) => h`
+          <button class="muscle-tile ${sel.has(m) ? 'on' : ''}" data-m="${m}" aria-pressed="${sel.has(m)}">
+            <span class="mt-icon">${raw(muscleIcon(m))}</span><span class="mt-name">${muscleName(m)}</span></button>`)}</div>
         <div class="sheet-actions">
           <button class="btn" data-no>Cancel</button>
           <button class="btn primary" data-yes>Build workout</button>
