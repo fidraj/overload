@@ -3,6 +3,7 @@
 import { EQUIPMENT, EQUIPMENT_PRESETS } from '../data.js';
 import { state, save, flush, exportData, replaceAll, eraseAll, getEx, fmtW, unit } from '../store.js';
 import { h, icon, app, confirmSheet, toast, download } from '../ui.js';
+import { initAnalytics, hasAnalytics } from '../analytics.js';
 
 export function renderSettings(el) {
   const s = state.settings;
@@ -48,13 +49,15 @@ export function renderSettings(el) {
 
     <section class="set-group">
       <h2 class="section-title">Your data</h2>
-      <p class="muted">Everything is stored in this browser only. Export a backup now and then, and use it to move to another device.</p>
+      <p class="muted">Your workouts are stored in this browser only. Export a backup now and then, and use it to move to another device.</p>
       <div class="btn-col">
         <button class="btn" data-act="export">${icon('down')} Export backup (JSON)</button>
         <label class="btn file-btn">${icon('up')} Import backup<input type="file" accept="application/json,.json" data-import hidden></label>
         <button class="btn" data-act="csv">${icon('down')} Export history as CSV</button>
         <button class="btn ghost-danger" data-act="erase">${icon('trash')} Erase all data</button>
       </div>
+      ${hasAnalytics ? h`${toggle('analytics', 'Count anonymous visits', s.analytics)}
+      <p class="muted small">Helps me see how many people use the app. Uses GoatCounter: no cookies, no personal data, and nothing about your workouts.</p>` : ''}
       <p class="muted small">${state.history.length} workouts, ${state.templates.length} saved workouts, ${state.custom.length} custom exercises.</p>
     </section>`);
 
@@ -101,6 +104,7 @@ export function renderSettings(el) {
     if (tg) {
       s[tg.dataset.toggle] = tg.checked;
       save('settings');
+      if (tg.dataset.toggle === 'analytics' && tg.checked) initAnalytics();
       return;
     }
     const inc2 = e.target.closest('[data-inc]');

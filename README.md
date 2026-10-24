@@ -41,9 +41,13 @@ Everything is stored in the browser you use the app in, so your phone and laptop
 
 Clearing your browser's site data for `github.io` deletes your workouts, so export a backup now and then.
 
+## Privacy and stats
+
+The app counts anonymous visits with [GoatCounter](https://www.goatcounter.com): which screen was opened, plus a few events (workout started, finished, shared). It uses no cookies and collects no personal data, and workout contents are never sent. Share links and other ids are stripped before counting. Anyone can turn it off in **Settings → Your data**. To use your own counter, or none, set `ENDPOINT` in `js/analytics.js`.
+
 ## Updating
 
-Edit the files and push. The service worker serves the cached copy first and fetches the new one in the background, so changes appear the second time you open the app. If you add or rename a JS or CSS file, also add it to the `SHELL` list in `sw.js` and bump `CACHE` (e.g. `overload-v2`).
+Edit the files and push. The app loads fresh files whenever it's online and only falls back to its cache offline, so changes show up on the next load. Open tabs reload themselves when a new version is deployed. If you add or rename a JS or CSS file, also add it to the `SHELL` list in `sw.js` and bump `CACHE` (e.g. `overload-v6`).
 
 ## Code map
 

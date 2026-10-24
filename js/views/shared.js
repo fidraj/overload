@@ -6,6 +6,7 @@ import { h, icon, toast, copyText } from '../ui.js';
 import { thumb } from '../components.js';
 import { decodeShare, importCustom } from '../share.js';
 import { doseText } from './today.js';
+import { trackEvent } from '../analytics.js';
 
 export function renderShared(el, code) {
   const d = decodeShare(code);
@@ -56,6 +57,7 @@ export function renderShared(el, code) {
     } else if (b.dataset.act === 'save') {
       importCustom(d.custom);
       saveTemplate(d.name, d.items);
+      trackEvent('shared-workout-saved');
       toast(`"${d.name}" is in your saved workouts`);
       location.hash = '#/';
     } else if (b.dataset.act === 'start') {

@@ -5,6 +5,7 @@ import {
   state, save, uid, getEx, allExercises, hasEquipment, historyIndex,
   toDisp, fromDisp, round, increment,
 } from './store.js';
+import { trackEvent } from './analytics.js';
 
 const HOUR = 36e5;
 const DAY = 24 * HOUR;
@@ -314,6 +315,7 @@ export function startWorkout(items, meta = {}) {
     exercises: items.map(entryFromItem),
   };
   save('active');
+  trackEvent('workout-started');
 }
 
 // Moves the active workout into history. Returns the saved record, or null if nothing was logged.
@@ -337,6 +339,7 @@ export function finishWorkout() {
   state.history.push(record);
   state.history.sort((x, y) => y.startedAt - x.startedAt);
   save('history');
+  trackEvent('workout-finished');
   return record;
 }
 

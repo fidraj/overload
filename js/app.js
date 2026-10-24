@@ -9,6 +9,7 @@ import { renderHistory, renderHistoryDetail } from './views/history.js';
 import { renderExercises, renderExerciseDetail, renderExerciseForm } from './views/exercises.js';
 import { renderSettings, applyTheme } from './views/settings.js';
 import { renderShared } from './views/shared.js';
+import { initAnalytics, trackPage } from './analytics.js';
 
 const routes = [
   [/^\/$/, (el) => (state.active ? renderWorkout(el) : renderToday(el)), 'workout'],
@@ -39,6 +40,7 @@ function render() {
   }
   main.onclick = main.oninput = main.onchange = main.onkeydown = main.onfocusin = null;
   match.view(main, ...match.params);
+  trackPage(path === '/' && state.active ? '/workout' : path);
   for (const a of document.querySelectorAll('#tabs a')) {
     if (a.dataset.tab === match.tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -59,6 +61,7 @@ hooks.onSaveError = () => toast('Storage is full. Export a backup in Settings an
 
 load();
 applyTheme();
+initAnalytics();
 initTimer();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 window.addEventListener('hashchange', () => {

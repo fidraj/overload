@@ -3,6 +3,7 @@
 import { MUSCLES, EQUIPMENT, TRACKS } from './data.js';
 import { state, save, getEx, isCustom } from './store.js';
 import { toast, copyText, sheet, h, icon } from './ui.js';
+import { trackEvent } from './analytics.js';
 
 function toBase64Url(text) {
   let bin = '';
@@ -75,6 +76,7 @@ export function importCustom(custom) {
 // straight from a button tap, which Safari requires.
 export function shareWorkout(name, items) {
   const url = shareUrl(name, items);
+  trackEvent('workout-shared');
   sheet({
     title: 'Share workout',
     body: h`<p class="sheet-text">Anyone who opens this link sees "${name}" and can save it to their own workouts.</p>

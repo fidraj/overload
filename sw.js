@@ -2,12 +2,13 @@
 // offline or slow), so a new deploy is picked up on the next load. Fonts are cache-first.
 // Bump CACHE when adding or renaming files.
 
-const CACHE = 'overload-v4';
+const CACHE = 'overload-v5';
 const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/app.css',
+  './js/analytics.js',
   './js/app.js',
   './js/art.js',
   './js/chart.js',

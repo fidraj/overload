@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   sound: true,
   vibrate: true,
   wakeLock: true,
+  analytics: true,
 };
 
 export const state = {
