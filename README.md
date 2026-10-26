@@ -48,7 +48,7 @@ The app counts anonymous visits with [GoatCounter](https://www.goatcounter.com):
 
 ## Updating
 
-Edit the files and push. The app loads fresh files whenever it's online and only falls back to its cache offline, so changes show up on the next load. Open tabs reload themselves when a new version is deployed. If you add or rename a JS or CSS file, also add it to the `SHELL` list in `sw.js` and bump `CACHE` (e.g. `overload-v7`).
+Edit the files and push. The app loads fresh files whenever it's online and only falls back to its cache offline, so changes show up on the next load. Open tabs reload themselves when a new version is deployed. If you add or rename a JS or CSS file, also add it to the `SHELL` list in `sw.js` and bump `CACHE` (e.g. `overload-v8`).
 
 ## Code map
 

@@ -57,7 +57,7 @@ export function renderWorkout(el) {
     })}</ul>` : h`<p class="empty-note">Add an exercise to start logging.</p>`}
     <button class="add-row" data-act="add">${icon('plus')} Add exercise</button>
 
-    <div class="cta-bar pin">
+    <div class="cta-bar">
       ${next ? h`<a class="btn primary big" href="#/workout/${next.uid}">${icon('play')} ${doneCount(next) || w.exercises.indexOf(next) ? 'Continue' : 'Begin'}: ${getEx(next.exId, next.name).name}</a>`
         : h`<button class="btn primary big" data-act="finish">${icon('check')} Finish workout</button>`}
     </div>
@@ -226,7 +226,7 @@ export function renderLogExercise(el, uid) {
       <figcaption class="map-legend"><span class="key pri"></span>Main muscles <span class="key sec"></span>Also worked</figcaption>
     </figure>
 
-    <nav class="cta-bar pin log-nav" aria-label="Exercises">
+    <nav class="cta-bar log-nav" aria-label="Exercises">
       ${prevEntry ? h`<a class="btn big icon-only" href="#/workout/${prevEntry.uid}" aria-label="Previous exercise: ${getEx(prevEntry.exId, prevEntry.name).name}">${icon('back')}</a>` : ''}
       ${nextEntry ? h`<a class="btn big ${isComplete(e) ? 'primary' : ''} next-btn" href="#/workout/${nextEntry.uid}" data-next>
           <span class="next-k">Next</span><span class="next-v">${getEx(nextEntry.exId, nextEntry.name).name}</span>${icon('next')}</a>`

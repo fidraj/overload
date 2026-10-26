@@ -149,7 +149,7 @@ export function renderHistoryDetail(el, id, flag) {
         <button class="btn" data-act="edit">${icon('edit')} Edit</button>
         <button class="btn ghost-danger" data-act="delete">${icon('trash')} Delete</button>`}
     </div>
-    ${done && !isEditing ? h`<div class="cta-bar pin"><a class="btn primary big" href="#/">${icon('check')} Done</a></div>` : ''}`);
+    ${done && !isEditing ? h`<div class="cta-bar"><a class="btn primary big" href="#/">${icon('check')} Done</a></div>` : ''}`);
 
   el.onclick = async (ev) => {
     const b = ev.target.closest('[data-act]');

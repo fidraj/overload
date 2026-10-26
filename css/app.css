@@ -125,13 +125,16 @@ body::before {
   pointer-events: none;
 }
 
-/* Home screen app: no rubber-band bounce of the whole page. */
+/* Home screen app: no rubber-band bounce of the whole page. iOS 26 also lays the page out
+   shorter than the screen by the status bar height, so bars fixed to the bottom stop above
+   the edge (WebKit bug 301108). A page at least screen-tall gets the full height back. */
 @media (display-mode: standalone) {
+  html { min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px))); }
   html, body { overscroll-behavior-y: none; }
 }
 
 /* Keyboard up on a phone: bars pinned to the bottom get out of the way. */
-body.typing #tabs, body.typing #dock, body.typing .cta-bar.pin { display: none; }
+body.typing #tabs, body.typing #dock, body.typing .cta-bar { display: none; }
 
 h1, h2, h3, p, ol, ul, figure { margin: 0; }
 ol, ul { padding: 0; list-style: none; }
@@ -161,7 +164,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
   margin: 0 auto;
   padding: calc(16px + var(--safe-t)) var(--gutter) calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 40px);
 }
-#view:has(.cta-bar.pin) { padding-bottom: calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 120px); }
+#view:has(.cta-bar) { padding-bottom: calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 120px); }
 
 /* ---- Type ----------------------------------------------------------------------- */
 
@@ -509,24 +512,19 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .opt-chip.accent { color: var(--blue); border-color: var(--blue); }
 .opt-chip.accent .i { color: currentColor; }
 
+/* Main action: pinned to the bottom of the screen, above the tab bar and rest timer. */
 .cta-bar {
-  position: sticky;
-  bottom: calc(var(--tabs-h) + var(--dock-h) + var(--safe-b));
-  z-index: 5;
-  display: flex;
-  gap: 8px;
-  margin: 12px calc(-1 * var(--gutter)) 0;
-  padding: 16px var(--gutter) 12px;
-  background: linear-gradient(to bottom, transparent, var(--bg) 24%);
-}
-/* Pinned: always at the bottom of the screen, above the tab bar and rest timer. */
-.cta-bar.pin {
   position: fixed;
   left: 0;
   right: 0;
+  bottom: calc(var(--tabs-h) + var(--dock-h) + var(--safe-b));
   z-index: 15;
+  display: flex;
+  gap: 8px;
   max-width: 600px;
   margin: 0 auto;
+  padding: 16px var(--gutter) 12px;
+  background: linear-gradient(to bottom, transparent, var(--bg) 24%);
 }
 .cta-bar .btn.primary, .cta-bar .next-btn { flex: 1; min-width: 0; }
 .cta-bar .btn.primary { overflow: hidden; text-overflow: ellipsis; }
@@ -671,19 +669,47 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 }
 .set-check .i { width: 26px; height: 26px; }
 .done .set-check { background: var(--green); border-color: var(--green); color: #fff; }
-.done .set-in { background: var(--green-soft); border-color: transparent; }
 
-/* Ticking a set: the check pops and draws itself, a ring pulses out, the fields flash green. */
-.just-done .set-check { animation: tick-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1), tick-ring 0.7s ease-out; }
-.just-done .set-check path { stroke-dasharray: 21; animation: tick-draw 0.32s 0.05s ease-out both; }
-.just-done .set-in { animation: tick-flash 0.8s ease-out; }
+/* A done set turns the whole row green. */
+.set-swipe .set-row { isolation: isolate; }
+.set-swipe .set-row::before {
+  content: '';
+  position: absolute;
+  inset: -3px -8px;
+  z-index: -1;
+  border-radius: 16px;
+  background: var(--green-soft);
+  opacity: 0;
+}
+.set-swipe .done::before { opacity: 1; }
+.set-swipe .done .set-in { background: transparent; border-color: transparent; }
+.set-swipe .done .set-in:focus { background: var(--surface); border-color: var(--blue); }
+.set-swipe .done:not(.warm) .set-no { background: transparent; color: var(--green); }
+
+/* Ticking a set: the green sweeps across the row from the left and pushes the numbers along,
+   the check pops and draws itself, and a ring pulses out. */
+.just-done::before { animation: row-sweep 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), row-glow 1s ease-out; }
+.just-done > :not(.set-check) { animation: row-push 0.55s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.just-done > :nth-child(2) { animation-delay: 0.03s; }
+.just-done > :nth-child(3) { animation-delay: 0.07s; }
+.just-done > :nth-child(4) { animation-delay: 0.11s; }
+.just-done .set-check {
+  animation: check-fill 0.12s 0.12s both, tick-pop 0.45s 0.12s cubic-bezier(0.3, 1.6, 0.5, 1) both, tick-ring 0.7s 0.15s ease-out;
+}
+@keyframes check-fill { from { border-color: var(--line); background: var(--surface); color: var(--ink-3); } }
+.just-done .set-check path { stroke-dasharray: 21; animation: tick-draw 0.3s 0.18s ease-out both; }
+@keyframes row-sweep {
+  from { clip-path: inset(0 100% 0 0 round 16px); }
+  to { clip-path: inset(0 0 0 0 round 16px); }
+}
+@keyframes row-glow { from { background: color-mix(in srgb, var(--green) 55%, var(--green-soft)); } }
+@keyframes row-push { 0% { transform: none; } 40% { transform: translateX(7px); } 100% { transform: none; } }
 @keyframes tick-pop { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes tick-ring {
   from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 60%, transparent); }
   to { box-shadow: 0 0 0 12px color-mix(in srgb, var(--green) 0%, transparent); }
 }
 @keyframes tick-draw { from { stroke-dashoffset: 21; } to { stroke-dashoffset: 0; } }
-@keyframes tick-flash { from { background: color-mix(in srgb, var(--green) 45%, var(--surface)); } }
 
 .set-pr {
   display: inline-flex;
@@ -784,7 +810,6 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .feel-btn.on .feel-desc { color: var(--ink-2); }
 .feel-next { margin-top: 12px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 
-.log-nav { margin-top: 18px; }
 .next-btn { justify-content: flex-start; gap: 10px; padding: 0 14px 0 18px; }
 .next-k { font-size: 14px; font-weight: 600; opacity: 0.75; }
 .next-v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }

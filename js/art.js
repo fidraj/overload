@@ -117,18 +117,18 @@ const head = (x, y) => `<circle class="p-head" cx="${x}" cy="${y}" r="4.6"/>`;
 const plate = (x, y, r = 5.5) => `<circle class="p-plate" cx="${x}" cy="${y}" r="${r}"/>`;
 const kit = (...parts) => `<g class="p-kit">${parts.join('')}</g>`;
 const cable = (...pts) => `<g class="p-cable">${P(...pts)}</g>`;
-const turn = (x, y, a) => `transform="translate(${x} ${y})${a ? ` rotate(${a})` : ''}"`;
+const turn = (x, y, a, sc = 1) => `transform="translate(${x} ${y})${a ? ` rotate(${a})` : ''}${sc !== 1 ? ` scale(${sc})` : ''}"`;
 // A handle 10 long, centred on (x, y), turned by a degrees (0 = horizontal).
 const grip = (x, y, a = 0) => `<path class="p-grip" ${turn(x, y, a)} d="M-5 0H5"/>`;
 // Dumbbell: a short handle with a head at each end.
-const dbell = (x, y, a = 0) => `<g class="p-dbell" ${turn(x, y, a)}><path d="M-5 0H5"/><rect x="-8.2" y="-4.6" width="4.4" height="9.2" rx="1.4"/><rect x="3.8" y="-4.6" width="4.4" height="9.2" rx="1.4"/></g>`;
+const dbell = (x, y, a = 0, sc = 1) => `<g class="p-dbell" ${turn(x, y, a, sc)}><path d="M-5 0H5"/><rect x="-8.2" y="-4.6" width="4.4" height="9.2" rx="1.4"/><rect x="3.8" y="-4.6" width="4.4" height="9.2" rx="1.4"/></g>`;
 // Kettlebell hanging from a hand at (x, y): handle on top, round bell below. a = 180 holds it bell-up.
-const kbell = (x, y, a = 0) => `<g class="p-kb" ${turn(x, y, a)}><path d="M-3.2 3.2V1a3.2 3.2 0 0 1 6.4 0v2.2"/><circle cy="7.6" r="4.9"/></g>`;
+const kbell = (x, y, a = 0, sc = 1) => `<g class="p-kb" ${turn(x, y, a, sc)}><path d="M-3.2 3.2V1a3.2 3.2 0 0 1 6.4 0v2.2"/><circle cy="7.6" r="4.9"/></g>`;
 
 // The weight held at (x, y) for load kind k. a turns dumbbells and handles; r sizes the plate.
-function W(k, x, y, { a = 0, r = 5.5, up = false } = {}) {
-  if (k === 'db') return dbell(x, y, a);
-  if (k === 'kb') return kbell(x, y, up ? 180 : a);
+function W(k, x, y, { a = 0, r = 5.5, up = false, sc = 1 } = {}) {
+  if (k === 'db') return dbell(x, y, a, sc);
+  if (k === 'kb') return kbell(x, y, up ? 180 : a, sc);
   if (k === 'bb') return plate(x, y, r);
   if (k === 'other') return grip(x, y, a);
   return '';
@@ -141,8 +141,10 @@ const PICTOS = {
     + head(11, 31) + P(16, 34, 36, 35) + P(36, 35, 46, 28, 50, 46, 55, 46) + P(19, 34, 19, 19) + W(k, 19, 15, { up: true }),
   incline: (k) => kit(P(14, 50, 34, 30), P(30, 44, 44, 44), P(36, 44, 36, 54))
     + head(15, 22) + P(19, 28, 32, 40) + P(32, 40, 44, 38, 46, 53, 51, 53) + P(21, 29, 25, 13) + W(k, 25, 9, { up: true }),
-  fly: (k) => (k === 'db' ? dbell(13, 31, 90) + dbell(51, 31, 90) : cable(5, 4, 15, 31) + cable(59, 4, 49, 31))
-    + head(32, 12) + P(32, 18, 32, 37) + P(26, 21, 38, 21) + P(26, 21, 15, 31) + P(38, 21, 49, 31)
+  fly: (k) => (k === 'db'
+    ? dbell(16, 30, 90, 0.85) + dbell(48, 30, 90, 0.85) + P(26, 21, 18, 30) + P(38, 21, 46, 30)
+    : cable(5, 4, 15, 31) + cable(59, 4, 49, 31) + P(26, 21, 15, 31) + P(38, 21, 49, 31))
+    + head(32, 12) + P(32, 18, 32, 37) + P(26, 21, 38, 21)
     + P(29, 37, 35, 37) + P(29, 37, 28, 58) + P(35, 37, 36, 58),
   pushup: () => head(51, 27) + P(45, 31, 25, 39, 8, 46) + P(8, 46, 5, 48) + P(44, 32, 45, 47),
   dip: () => kit(P(10, 36, 22, 36), P(42, 36, 54, 36), P(14, 36, 14, 60), P(50, 36, 50, 60))
@@ -150,11 +152,11 @@ const PICTOS = {
     + P(29, 36, 35, 36) + P(29, 36, 28, 48, 31, 55) + P(35, 36, 36, 48, 33, 55),
   // Barbell overhead; dumbbells and kettlebells one per hand, elbows out.
   press: (k) => (k === 'db' || k === 'kb'
-    ? head(32, 17) + P(26, 25, 15, 25, 15, 14) + P(38, 25, 49, 25, 49, 14) + W(k, 15, 10, { up: true }) + W(k, 49, 10, { up: true })
+    ? head(32, 17) + P(26, 25, 21, 30, 21, 16) + P(38, 25, 43, 30, 43, 16) + W(k, 20, 12, { up: true, sc: 0.8 }) + W(k, 44, 12, { up: true, sc: 0.8 })
     : kit(P(13, 8, 51, 8)) + plate(13, 8, 5) + plate(51, 8, 5) + head(32, 17) + P(26, 25, 23, 9) + P(38, 25, 41, 9))
     + P(32, 23, 32, 41) + P(26, 25, 38, 25) + legs(41),
-  raise: (k) => head(32, 13) + P(32, 19, 32, 38) + P(26, 22, 38, 22) + P(26, 22, 11, 22) + P(38, 22, 53, 22)
-    + W(k, 8, 22, { a: 90 }) + W(k, 56, 22, { a: 90 })
+  raise: (k) => head(32, 13) + P(32, 19, 32, 38) + P(26, 22, 38, 22) + P(26, 22, 15, 25) + P(38, 22, 49, 25)
+    + W(k, 13, 25, { a: 90, sc: 0.85 }) + W(k, 51, 25, { a: 90, sc: 0.85 })
     + legs(38),
   pull_high: () => head(32, 15) + P(32, 21, 32, 40) + P(26, 23, 38, 23) + P(26, 23, 15, 19, 20, 9) + P(38, 23, 49, 19, 44, 9)
     + grip(20, 9) + grip(44, 9)
