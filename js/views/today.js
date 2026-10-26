@@ -1,11 +1,11 @@
 // Workout tab when no workout is running: today's generated plan, its options, exercise
 // details and saved workouts.
 
-import { SPLITS, GOALS } from '../data.js';
+import { SPLITS, GOALS, FEELS } from '../data.js';
 import { state, save, getEx, fmtW, unit } from '../store.js';
 import {
   ensureDraft, recovery, suggestion, lastSession, working, defaultItem, estimateMinutes,
-  startWorkout, saveTemplate, isTimed,
+  startWorkout, saveTemplate, isTimed, rememberRest,
 } from '../engine.js';
 import { bodyMap } from '../art.js';
 import {
@@ -24,6 +24,15 @@ export function restLabel(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return m ? `${m}:${String(s).padStart(2, '0')}` : `${s} sec`;
+}
+
+// Why the weight suggestion says what it says.
+export function sugReason(sug, max) {
+  if (!sug) return '';
+  if (sug.kind === 'up') return sug.reason === 'easy' ? 'Last time felt easy.' : 'You hit the top of the range on every set.';
+  if (sug.kind === 'down') return 'Last time was too heavy.';
+  if (sug.reason === 'max') return `Last time felt too heavy. Stay at ${fmtW(sug.w)} ${unit()} and get every rep.`;
+  return `Stay at ${fmtW(sug.w)} ${unit()} until you reach ${max} reps on every set.`;
 }
 
 // "4 sets, 6–10 reps, 60 kg"
@@ -109,7 +118,8 @@ function planRow(it, i) {
       <span class="ex-text">
         <span class="ex-title">${ex.name}</span>
         <span class="ex-meta">${doseText(it, ex, topOf(it.exId))}</span>
-        ${sug?.kind === 'up' ? h`<span class="up-note">${icon('up')} Ready for ${fmtW(sug.w)} ${unit()}</span>` : ''}
+        ${sug?.kind === 'up' ? h`<span class="up-note">${icon('up')} Ready for ${fmtW(sug.w)} ${unit()}</span>`
+          : sug?.kind === 'down' ? h`<span class="up-note down">${icon('down')} Drop to ${fmtW(sug.w)} ${unit()}</span>` : ''}
       </span>
     </a>
     <button class="icon-btn" data-act="more" data-i="${i}" aria-label="Options for ${ex.name}">${icon('more')}</button>
@@ -364,8 +374,9 @@ export function renderPlanItem(el, idx) {
       ${last ? h`
         <p class="last-date">${ago(last.w.startedAt)}, ${last.w.name}</p>
         <p class="last-sets">${working(last.e.sets).map((s) => setShort(s, ex)).join(',  ')}</p>
-        ${sug?.kind === 'up' ? h`<p class="up-note big">${icon('up')} You hit the top of the range on every set. Try ${fmtW(sug.w)} ${unit()} today.</p>`
-          : sug?.kind === 'hold' ? h`<p class="hint">Stay at ${fmtW(sug.w)} ${unit()} until you reach ${it.max} reps on every set.</p>` : ''}`
+        ${sug?.kind === 'up' || sug?.kind === 'down' ? h`<p class="up-note big ${sug.kind}">${icon(sug.kind)} ${sugReason(sug, it.max)} Try ${fmtW(sug.w)} ${unit()} today.</p>`
+          : sug ? h`<p class="hint">${sugReason(sug, it.max)}</p>` : ''}
+        ${FEELS[last.e.feel] && sug?.reason !== last.e.feel ? h`<p class="feel-tag">${FEELS[last.e.feel].tag}</p>` : ''}`
         : h`<p class="hint">First time doing this one. Start light, find a weight you can lift for ${it.max} clean reps, and it'll be remembered.</p>`}
     </section>
 
@@ -401,8 +412,10 @@ export function renderPlanItem(el, idx) {
     const f = e.target.dataset.f;
     if (!f) return;
     const v = Math.round(Number(e.target.value));
-    if (f === 'rest') it.rest = v;
-    else if (v > 0) it[f] = v;
+    if (f === 'rest') {
+      it.rest = v;
+      rememberRest(it.exId, v);
+    } else if (v > 0) it[f] = v;
     if (it.max < it.min) [it.min, it.max] = [it.max, it.min];
     state.draft.edited = true;
     save('draft');

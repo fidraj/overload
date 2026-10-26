@@ -1,6 +1,6 @@
 // Exercises tab: library, exercise progress detail and custom exercises.
 
-import { MUSCLES, EQUIPMENT, TRACKS } from '../data.js';
+import { MUSCLES, EQUIPMENT, TRACKS, FEELS } from '../data.js';
 import { state, save, allExercises, getEx, isCustom, historyIndex, fmtW, toDisp, unit, uid, round } from '../store.js';
 import { working, e1rm, bests, hasWeight, lastSession } from '../engine.js';
 import {
@@ -185,7 +185,7 @@ export function renderExerciseDetail(el, id) {
       <h2 class="section-title">Sessions</h2>
       <ul class="sess-list">${sessions.map(({ w, e }) => h`<li>
         <a class="sess" href="#/history/${w.id}">
-          <span class="sess-date">${dateShort(w.startedAt)}</span>
+          <span class="sess-date">${dateShort(w.startedAt)}${FEELS[e.feel] ? h` <span class="feel-tag">${FEELS[e.feel].tag}</span>` : ''}</span>
           <span class="sess-sets">${e.sets.map((s) => (s.wu ? `W ${setText(s, ex)}` : setText(s, ex))).join(', ')}</span>
         </a></li>`)}</ul>` : h`
       <p class="empty-note">No sessions yet. Once you log ${ex.name}, your best sets and a progress chart appear here.</p>

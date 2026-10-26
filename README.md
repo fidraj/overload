@@ -5,8 +5,9 @@ A workout generator and lifting log that runs entirely in the browser. It's stat
 ## What it does
 
 - **Generates workouts.** Choose a split (Smart, Push, Pull, Legs, Upper, Lower, Full body, Arms, Core, or pick your own muscles), how long you have, and a goal (strength, muscle growth or endurance). Smart mode rotates push, pull and legs based on which muscles have recovered since your last sessions.
-- **Logs every set.** Each set row shows what you lifted last time and prefills it. Tick a set to save it and start the rest timer. A set can also be marked as a warm-up.
-- **Gives progressive overload hints.** When you hit the top of the rep range on every set last time, the exercise shows "Try 62.5 kg". Tap it to fill the heavier weight in, or ignore it. You decide when to add weight. The step sizes can be changed in Settings.
+- **Logs every set.** Each set row shows what you lifted last time and prefills it. Tick a set to save it and start the rest timer, which also shows what's next. New personal records are flagged as you go. Swipe a set left to delete it. A set can also be marked as a warm-up.
+- **Gives progressive overload hints.** When you hit the top of the rep range on every set last time, the exercise shows "Try 62.5 kg". After each exercise you can tap how it felt: "Easy" suggests going heavier next time, "Too much" suggests a step lighter. Tap the hint to fill the weight in, or ignore it. You decide. The step sizes can be changed in Settings.
+- **Remembers your rests.** Change the rest for an exercise once and it's used from then on. A default rest can be set in Settings.
 - **Saves workouts.** Save any generated workout, or any past one, as a template and start it again with one tap.
 - **Keeps history and progress.** Every workout is kept with its sets, volume and new records. You can edit or delete past workouts. Each exercise has a chart of estimated 1-rep max, heaviest set or volume, plus its full session list.
 - **Has ~140 built-in exercises** for barbells, dumbbells, kettlebells, cables, machines, bands and bodyweight. You can add your own.
@@ -47,7 +48,7 @@ The app counts anonymous visits with [GoatCounter](https://www.goatcounter.com):
 
 ## Updating
 
-Edit the files and push. The app loads fresh files whenever it's online and only falls back to its cache offline, so changes show up on the next load. Open tabs reload themselves when a new version is deployed. If you add or rename a JS or CSS file, also add it to the `SHELL` list in `sw.js` and bump `CACHE` (e.g. `overload-v6`).
+Edit the files and push. The app loads fresh files whenever it's online and only falls back to its cache offline, so changes show up on the next load. Open tabs reload themselves when a new version is deployed. If you add or rename a JS or CSS file, also add it to the `SHELL` list in `sw.js` and bump `CACHE` (e.g. `overload-v7`).
 
 ## Code map
 

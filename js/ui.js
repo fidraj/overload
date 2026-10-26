@@ -44,6 +44,7 @@ const ICONS = {
   library: '<path d="M5 4.5h3.5v15H5zM10.5 4.5H14v15h-3.5zM16 5.3l3.3-.8 3 14.6-3.3.8z"/>',
   settings: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
   swap: '<path d="M7 4 3.5 7.5 7 11M3.5 7.5H17M17 13l3.5 3.5L17 20M20.5 16.5H7"/>',
   more: '<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -233,11 +234,18 @@ export function promptSheet({ title, label, value = '', ok = 'Save', maxlength =
 // ---- Toast -----------------------------------------------------------------------------
 
 let toastTimer;
-export function toast(msg) {
+// With action (e.g. "Undo"), the toast shows a button and stays a little longer.
+export function toast(msg, { action, onAction } = {}) {
   const root = document.getElementById('toast-root');
-  root.innerHTML = String(h`<div class="toast" role="status">${msg}</div>`);
+  root.innerHTML = String(h`<div class="toast" role="status"><span>${msg}</span>${action ? h`<button class="toast-btn">${action}</button>` : ''}</div>`);
+  if (action) {
+    root.querySelector('.toast-btn').onclick = () => {
+      root.innerHTML = '';
+      onAction();
+    };
+  }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { root.innerHTML = ''; }, 2800);
+  toastTimer = setTimeout(() => { root.innerHTML = ''; }, action ? 5000 : 2800);
 }
 
 // ---- Formatting -------------------------------------------------------------------------

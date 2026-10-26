@@ -14,6 +14,7 @@ export const isTimed = (ex) => ex.track === 't' || ex.track === 'wt';
 export const hasWeight = (ex) => ex.track === 'wr' || ex.track === 'bw' || ex.track === 'wt';
 export const working = (sets) => sets.filter((s) => !s.wu);
 export const e1rm = (w, r) => (w > 0 && r > 0 ? (r === 1 ? w : w * (1 + r / 30)) : 0);
+export const volumeOf = (sets) => working(sets).reduce((a, s) => a + (s.w > 0 && s.r > 0 ? s.w * s.r : 0), 0);
 
 // ---- Recovery ----------------------------------------------------------------
 // Each working set adds fatigue to its primary muscles (full) and secondary muscles (half).
@@ -47,17 +48,32 @@ export function recovery(now = Date.now()) {
 
 // [sets, min, max, rest seconds]; min/max are reps, or seconds for timed exercises.
 const SCHEMES = {
-  strength: { c: [5, 3, 5, 180], i: [3, 6, 8, 120], bw: [4, 5, 8, 120], r: [3, 8, 12, 90], t: [3, 20, 40, 90] },
-  hypertrophy: { c: [4, 6, 10, 120], i: [3, 10, 15, 75], bw: [3, 8, 15, 90], r: [3, 12, 15, 60], t: [3, 30, 60, 60] },
+  strength: { c: [5, 3, 5, 180], i: [3, 6, 8, 90], bw: [4, 5, 8, 90], r: [3, 8, 12, 75], t: [3, 20, 40, 75] },
+  hypertrophy: { c: [4, 6, 10, 90], i: [3, 10, 15, 60], bw: [3, 8, 15, 60], r: [3, 12, 15, 45], t: [3, 30, 60, 45] },
   endurance: { c: [3, 12, 15, 60], i: [3, 15, 20, 45], bw: [3, 15, 25, 45], r: [3, 15, 25, 45], t: [3, 45, 90, 45] },
 };
 
-export function defaultItem(exId, goal = state.settings.goal) {
-  const ex = getEx(exId);
+function scheme(ex, goal) {
   const s = SCHEMES[goal] || SCHEMES.hypertrophy;
-  const key = isTimed(ex) ? 't' : ex.track === 'r' ? 'r' : ex.track === 'bw' ? 'bw' : ex.kind;
-  const [sets, min, max, rest] = s[key];
-  return { exId, sets, min, max, rest };
+  return s[isTimed(ex) ? 't' : ex.track === 'r' ? 'r' : ex.track === 'bw' ? 'bw' : ex.kind];
+}
+
+// Rest for an exercise: the last one you picked for it, else the Settings default, else the goal's.
+export function restFor(exId, goal = state.settings.goal) {
+  const mine = state.prefs.rest[exId];
+  if (mine != null) return mine;
+  const def = state.settings.rest;
+  return typeof def === 'number' ? def : scheme(getEx(exId), goal)[3];
+}
+
+export function rememberRest(exId, sec) {
+  state.prefs.rest[exId] = sec;
+  save('prefs');
+}
+
+export function defaultItem(exId, goal = state.settings.goal) {
+  const [sets, min, max] = scheme(getEx(exId), goal);
+  return { exId, sets, min, max, rest: restFor(exId, goal) };
 }
 
 export function estimateSec(item) {
@@ -81,20 +97,32 @@ function sessionCount(exId, sinceMs) {
   return list.filter(({ w }) => w.startedAt >= sinceMs).length;
 }
 
-// Progressive overload hint: if every set at last session's top weight reached the top of
-// the rep range, suggest one increment more. Otherwise stay and chase the reps.
-export function suggestion(exId, max) {
-  const ex = getEx(exId);
+// Progressive overload rule for one session's sets and how it felt. If every set at the top
+// weight reached the top of the rep range, or it felt easy, go one step heavier. If it was too
+// much and reps were missed, go one step lighter. Otherwise stay and chase the reps.
+// reason: 'reps' | 'easy' | 'max'.
+export function progression(ex, sets, max, feel) {
   if (!hasWeight(ex)) return null;
-  const last = lastSession(exId);
-  if (!last) return null;
-  const sets = working(last.e.sets);
-  const top = Math.max(...sets.map((s) => s.w || 0));
+  sets = working(sets);
+  const top = Math.max(0, ...sets.map((s) => s.w || 0));
   if (top <= 0) return null;
   const field = ex.track === 'wt' ? 's' : 'r';
   const hit = sets.filter((s) => (s.w || 0) === top).every((s) => (s[field] || 0) >= max);
-  if (!hit) return { kind: 'hold', w: top };
-  return { kind: 'up', w: fromDisp(round(toDisp(top) + increment(ex), 2)), from: top };
+  const step = (dir) => fromDisp(round(toDisp(top) + dir * increment(ex), 2));
+  if (feel === 'max') {
+    return !hit && toDisp(top) > increment(ex)
+      ? { kind: 'down', w: step(-1), from: top, reason: 'max' }
+      : { kind: 'hold', w: top, reason: 'max' };
+  }
+  if (hit) return { kind: 'up', w: step(1), from: top, reason: 'reps' };
+  if (feel === 'easy') return { kind: 'up', w: step(1), from: top, reason: 'easy' };
+  return { kind: 'hold', w: top };
+}
+
+// What to lift today, based on the last session.
+export function suggestion(exId, max) {
+  const last = lastSession(exId);
+  return last ? progression(getEx(exId), last.e.sets, max, last.e.feel) : null;
 }
 
 // Best values across all logged sessions before a timestamp.
@@ -110,6 +138,28 @@ export function bests(exId, before = Infinity) {
       out.s = Math.max(out.s, s.s || 0);
     }
   }
+  return out;
+}
+
+// Indexes of done working sets that beat every earlier session and every earlier set today.
+export function setRecords(exId, sets, before) {
+  const out = new Set();
+  const best = bests(exId, before);
+  if (!best.n) return out;
+  const ex = getEx(exId);
+  const eps = 1e-6;
+  sets.forEach((s, i) => {
+    if (!s.done || s.wu) return;
+    const e1 = e1rm(s.w, s.r);
+    if ((hasWeight(ex) && (s.w || 0) > best.w + eps)
+      || (ex.track === 'wr' && e1 > best.e1 + eps)
+      || (isTimed(ex) && (s.s || 0) > best.s)
+      || ((ex.track === 'r' || ex.track === 'bw') && (s.r || 0) > best.r)) out.add(i);
+    best.w = Math.max(best.w, s.w || 0);
+    best.e1 = Math.max(best.e1, e1);
+    best.r = Math.max(best.r, s.r || 0);
+    best.s = Math.max(best.s, s.s || 0);
+  });
   return out;
 }
 
@@ -135,10 +185,8 @@ export function workoutStats(w) {
   let volume = 0;
   let sets = 0;
   for (const e of w.exercises) {
-    for (const s of working(e.sets)) {
-      sets++;
-      if (s.w > 0 && s.r > 0) volume += s.w * s.r;
-    }
+    sets += working(e.sets).length;
+    volume += volumeOf(e.sets);
   }
   return { volume, sets, duration: (w.finishedAt || Date.now()) - w.startedAt };
 }
@@ -296,7 +344,7 @@ export function entryFromItem(it) {
     name: getEx(it.exId).name,
     min: it.min,
     max: it.max,
-    rest: it.rest,
+    rest: state.prefs.rest[it.exId] ?? it.rest,
     sets: Array.from({ length: it.sets }, () => ({ w: null, r: null, s: null, done: false, wu: false })),
   };
 }
@@ -328,6 +376,7 @@ export function finishWorkout() {
       min: e.min,
       max: e.max,
       rest: e.rest,
+      ...(e.feel ? { feel: e.feel } : {}),
       sets: e.sets.filter((s) => s.done).map(({ w, r, s, wu }) => ({ w, r, s, wu })),
     }))
     .filter((e) => e.sets.length);

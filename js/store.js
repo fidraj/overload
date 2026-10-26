@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   customMuscles: ['chest', 'biceps'],
   equipment: Object.keys(EQUIPMENT),
   inc: { kg: { barbell: 2.5, dumbbell: 2, machine: 5 }, lb: { barbell: 5, dumbbell: 5, machine: 10 } },
+  rest: 'auto', // seconds, or 'auto' to follow the goal
   autoRest: true,
   sound: true,
   vibrate: true,
@@ -27,7 +28,7 @@ export const state = {
   history: [], // finished workouts, newest first
   templates: [],
   custom: [], // user-created exercises
-  prefs: { fav: {}, excl: {} },
+  prefs: { fav: {}, excl: {}, rest: {} }, // rest: last rest picked per exercise
   active: null, // workout in progress
   draft: null, // generated plan shown on the Workout tab
 };
@@ -56,7 +57,7 @@ export function load() {
   state.history = read('history', []);
   state.templates = read('templates', []);
   state.custom = read('custom', []);
-  state.prefs = { fav: {}, excl: {}, ...read('prefs', {}) };
+  state.prefs = { fav: {}, excl: {}, rest: {}, ...read('prefs', {}) };
   state.active = read('active', null);
   state.draft = read('draft', null);
   sortHistory();

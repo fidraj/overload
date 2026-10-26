@@ -39,6 +39,7 @@ function render() {
     return;
   }
   main.onclick = main.oninput = main.onchange = main.onkeydown = main.onfocusin = null;
+  main.onpointerdown = main.onpointermove = main.onpointerup = main.onpointercancel = null;
   match.view(main, ...match.params);
   trackPage(path === '/' && state.active ? '/workout' : path);
   for (const a of document.querySelectorAll('#tabs a')) {
@@ -82,6 +83,24 @@ window.addEventListener('storage', (e) => {
 });
 render();
 initScrollRows();
+initKeyboard();
+
+// Phones: while the keyboard is up, hide the bars pinned to the bottom so they don't ride up
+// over the fields. When it closes, nudge the scroll so iOS puts the page back in place.
+function initKeyboard() {
+  if (!matchMedia('(pointer: coarse)').matches) return;
+  const isField = (el) => !!el?.matches?.('input:not([type="checkbox"]):not([type="file"]), textarea');
+  document.addEventListener('focusin', (e) => {
+    if (isField(e.target)) document.body.classList.add('typing');
+  });
+  document.addEventListener('focusout', () => {
+    setTimeout(() => {
+      if (isField(document.activeElement)) return;
+      document.body.classList.remove('typing');
+      window.scrollTo(window.scrollX, window.scrollY);
+    }, 80);
+  });
+}
 
 // Chip rows scroll sideways. Make that work with a mouse wheel and by dragging on desktop.
 function initScrollRows() {

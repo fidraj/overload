@@ -1,21 +1,22 @@
 // Workout tab while a workout is running: an overview of the exercises, and a focused
 // screen per exercise for logging sets.
 
-import { TRACKS } from '../data.js';
-import { state, save, getEx, fmtW, fromDisp, unit } from '../store.js';
+import { TRACKS, FEELS } from '../data.js';
+import { state, save, getEx, fmtW, fromDisp, toDisp, unit } from '../store.js';
 import {
   lastSession, suggestion, working, finishWorkout, saveTemplate, itemFromEntry, entryFromItem,
-  defaultItem, isTimed,
+  defaultItem, isTimed, setRecords, progression, volumeOf, e1rm, rememberRest,
 } from '../engine.js';
 import { bodyMap } from '../art.js';
 import {
-  h, raw, icon, app, choiceSheet, confirmSheet, actionSheet, promptSheet, toast, clock, setShort, rangeText,
-  muscleName, listText, ago,
+  h, raw, icon, app, choiceSheet, confirmSheet, actionSheet, promptSheet, toast, clock, setShort, setText,
+  rangeText, muscleName, listText, ago, numFmt,
 } from '../ui.js';
 import { thumb } from '../components.js';
 import { pickExercise } from '../picker.js';
-import { startRest, unlockAudio, renderDock } from '../timer.js';
-import { restLabel, REST_OPTIONS } from './today.js';
+import { shareWorkout } from '../share.js';
+import { startRest, stopRest, unlockAudio, renderDock, chime, haptic } from '../timer.js';
+import { restLabel, REST_OPTIONS, sugReason } from './today.js';
 
 const LABELS = { w: () => unit(), r: () => 'Reps', s: () => 'Sec' };
 
@@ -56,7 +57,7 @@ export function renderWorkout(el) {
     })}</ul>` : h`<p class="empty-note">Add an exercise to start logging.</p>`}
     <button class="add-row" data-act="add">${icon('plus')} Add exercise</button>
 
-    <div class="cta-bar">
+    <div class="cta-bar pin">
       ${next ? h`<a class="btn primary big" href="#/workout/${next.uid}">${icon('play')} ${doneCount(next) || w.exercises.indexOf(next) ? 'Continue' : 'Begin'}: ${getEx(next.exId, next.name).name}</a>`
         : h`<button class="btn primary big" data-act="finish">${icon('check')} Finish workout</button>`}
     </div>
@@ -128,6 +129,7 @@ async function exerciseMenu(entry) {
     const r = await choiceSheet({ title: 'Rest between sets', value: entry.rest, options: REST_OPTIONS.map((x) => ({ value: x, label: restLabel(x) })) });
     if (r == null) return false;
     entry.rest = r;
+    rememberRest(entry.exId, r);
   } else if (v === 'upm') a.exercises.splice(i - 1, 0, ...a.exercises.splice(i, 1));
   else if (v === 'downm') a.exercises.splice(i + 1, 0, ...a.exercises.splice(i, 1));
   else if (v === 'remove') {
@@ -157,6 +159,7 @@ export function renderLogExercise(el, uid) {
   const prev = last ? working(last.e.sets) : [];
   const sug = suggestion(e.exId, e.max);
   const ph = placeholders(e, prev);
+  const recs = setRecords(e.exId, e.sets, w.startedAt);
   const prevEntry = w.exercises[i - 1];
   const nextEntry = w.exercises[i + 1];
   let n = 0;
@@ -179,10 +182,10 @@ export function renderLogExercise(el, uid) {
     </div>
 
     ${last ? h`<div class="last-card">
-      <p class="last-date">Last time, ${ago(last.w.startedAt)}</p>
+      <p class="last-date">Last time, ${ago(last.w.startedAt)}${last.e.feel ? `, ${FEELS[last.e.feel].tag.toLowerCase()}` : ''}</p>
       <p class="last-sets">${prev.map((s) => setShort(s, ex)).join(',  ')}</p>
-      ${sug?.kind === 'up' ? h`<button class="up-chip" data-act="apply">${icon('up')} Try ${fmtW(sug.w)} ${unit()}</button>
-        <span class="hint">You hit the top of the range on every set.</span>` : ''}
+      ${sug?.kind === 'up' || sug?.kind === 'down' ? h`<button class="up-chip ${sug.kind}" data-act="apply">${icon(sug.kind)} Try ${fmtW(sug.w)} ${unit()}</button>
+        <span class="hint">${sugReason(sug, e.max)}</span>` : ''}
     </div>` : h`<p class="hint first-time">First time doing this one. Pick a weight you can lift for ${e.max} clean reps.</p>`}
 
     <div class="sets log" role="table" aria-label="${ex.name} sets">
@@ -194,15 +197,23 @@ export function renderLogExercise(el, uid) {
       ${e.sets.map((s, si) => {
         const label = s.wu ? 'W' : String(++n);
         const p = s.wu ? null : prev[n - 1];
-        return h`<div class="set-row f${fields.length} ${s.done ? 'done' : ''} ${s.wu ? 'warm' : ''}" role="row" data-si="${si}">
-          <button class="set-no" data-act="set" aria-label="Set ${label} options">${label}</button>
-          <span class="set-prev">${p ? setShort(p, ex) : '–'}</span>
-          ${fields.map((f) => input(f, s, ph[si], ex, label))}
-          <button class="set-check" data-act="check" aria-pressed="${s.done}" aria-label="Mark set ${label} done">${icon('check')}</button>
+        const prevText = p ? setShort(p, ex) : '–';
+        return h`<div class="set-swipe" role="none" data-si="${si}">
+          <button class="set-del" data-act="delset" tabindex="-1" aria-hidden="true">${icon('trash')} Delete</button>
+          <div class="set-row f${fields.length} ${s.done ? 'done' : ''} ${s.wu ? 'warm' : ''}" role="row">
+            <button class="set-no" data-act="set" aria-label="Set ${label} options">${label}</button>
+            <span class="set-prev" data-prev="${prevText}">${recs.has(si) ? prBadge() : prevText}</span>
+            ${fields.map((f) => input(f, s, ph[si], ex, label))}
+            <button class="set-check" data-act="check" aria-pressed="${s.done}" aria-label="Mark set ${label} done">${icon('check')}</button>
+          </div>
         </div>`;
       })}
     </div>
-    <button class="add-row" data-act="addset">${icon('plus')} Add set</button>
+    <div class="set-actions">
+      <button class="add-row" data-act="addset">${icon('plus')} Add set</button>
+      ${e.sets.length ? h`<button class="add-row" data-act="rmset">${icon('minus')} Remove set</button>` : ''}
+    </div>
+    <div data-complete>${isComplete(e) ? doneCard(e, ex, recs) : ''}</div>
 
     <div class="btn-row">
       <button class="btn" data-act="exmenu">${icon('swap')} Swap or remove</button>
@@ -215,7 +226,7 @@ export function renderLogExercise(el, uid) {
       <figcaption class="map-legend"><span class="key pri"></span>Main muscles <span class="key sec"></span>Also worked</figcaption>
     </figure>
 
-    <nav class="cta-bar log-nav" aria-label="Exercises">
+    <nav class="cta-bar pin log-nav" aria-label="Exercises">
       ${prevEntry ? h`<a class="btn big icon-only" href="#/workout/${prevEntry.uid}" aria-label="Previous exercise: ${getEx(prevEntry.exId, prevEntry.name).name}">${icon('back')}</a>` : ''}
       ${nextEntry ? h`<a class="btn big ${isComplete(e) ? 'primary' : ''} next-btn" href="#/workout/${nextEntry.uid}" data-next>
           <span class="next-k">Next</span><span class="next-v">${getEx(nextEntry.exId, nextEntry.name).name}</span>${icon('next')}</a>`
@@ -224,6 +235,7 @@ export function renderLogExercise(el, uid) {
 
   el.onclick = (ev) => onLogClick(ev, e);
   el.oninput = (ev) => onInput(ev, e);
+  initSwipe(el, e);
   el.onfocusin = (ev) => {
     if (ev.target.matches('.set-in')) setTimeout(() => ev.target.select(), 0);
   };
@@ -275,6 +287,7 @@ function onInput(ev, entry) {
   set[f] = v == null ? null : f === 'w' ? fromDisp(v) : Math.round(v);
   save('active');
   refreshPlaceholders(ev.currentTarget, entry);
+  if (set.done) afterChange(entry);
 }
 
 // Keep later rows' placeholders in step with what was just typed.
@@ -289,15 +302,17 @@ function refreshPlaceholders(root, entry) {
 }
 
 function toggleCheck(btn, entry) {
-  const row = btn.closest('.set-row');
-  const set = entry.sets[Number(row.dataset.si)];
+  const wrap = btn.closest('[data-si]');
+  const row = wrap.querySelector('.set-row');
+  const si = Number(wrap.dataset.si);
+  const set = entry.sets[si];
   const ex = getEx(entry.exId, entry.name);
   if (set.done) {
     set.done = false;
-    row.classList.remove('done');
+    row.classList.remove('done', 'just-done');
     btn.setAttribute('aria-pressed', 'false');
     save('active');
-    updateNext(entry);
+    afterChange(entry);
     return;
   }
   unlockAudio();
@@ -316,25 +331,199 @@ function toggleCheck(btn, entry) {
     }
   }
   set.done = true;
-  row.classList.add('done');
+  row.classList.remove('just-done');
+  void row.offsetWidth; // restart the tick animation
+  row.classList.add('done', 'just-done');
   btn.setAttribute('aria-pressed', 'true');
   save('active');
-  updateNext(entry);
-  const a = state.active;
-  const workoutDone = a.exercises.every(isComplete);
-  if (state.settings.autoRest && !workoutDone) startRest(entry.rest);
-  if (isComplete(entry)) toast(workoutDone ? 'All sets done. Tap Finish to save the workout.' : 'Exercise done. Rest, then move on to the next one.');
+  const pr = afterChange(entry).has(si);
+  const exDone = isComplete(entry);
+  const workoutDone = state.active.exercises.every(isComplete);
+  haptic(pr || exDone ? 25 : 12);
+  chime(exDone ? 'done' : pr ? 'pr' : 'set');
+  if (workoutDone) stopRest();
+  else if (state.settings.autoRest) startRest(entry.rest, nextUp(entry));
+  if (pr) toast(`New PR: ${setText(set, ex)}`);
 }
 
-function updateNext(entry) {
-  document.querySelector('[data-next]')?.classList.toggle('primary', isComplete(entry));
+const prBadge = () => h`<span class="set-pr">${icon('trophy')} PR</span>`;
+
+// Update what depends on which sets are done: PR badges, the Next button and the done card.
+// Returns the PR set indexes.
+function afterChange(entry) {
+  const recs = setRecords(entry.exId, entry.sets, state.active.startedAt);
+  for (const wrap of document.querySelectorAll('.set-swipe')) {
+    const cell = wrap.querySelector('.set-prev');
+    if (recs.has(Number(wrap.dataset.si))) cell.innerHTML = String(prBadge());
+    else cell.textContent = cell.dataset.prev;
+  }
+  const complete = isComplete(entry);
+  document.querySelector('[data-next]')?.classList.toggle('primary', complete);
+  const box = document.querySelector('[data-complete]');
+  if (!box) return recs;
+  const shown = box.childElementCount > 0;
+  box.innerHTML = complete ? String(doneCard(entry, getEx(entry.exId, entry.name), recs)) : '';
+  if (complete && !shown) {
+    const card = box.firstElementChild;
+    card.classList.add('enter');
+    card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+  }
+  return recs;
+}
+
+// The heaviest or best set of an exercise.
+function topSet(sets, ex) {
+  const ws = working(sets);
+  if (!ws.length) return null;
+  const score = (s) => {
+    if (ex.track === 'wr') return e1rm(s.w, s.r) || s.w || 0;
+    if (isTimed(ex)) return (s.w || 0) * 1e4 + (s.s || 0);
+    return (s.w || 0) * 1e4 + (s.r || 0);
+  };
+  return ws.reduce((best, s) => (score(s) > score(best) ? s : best));
+}
+
+function nextText(nx, max) {
+  if (nx.kind === 'up') return `Next time: try ${fmtW(nx.w)} ${unit()}.`;
+  if (nx.kind === 'down') return `Next time: drop to ${fmtW(nx.w)} ${unit()}.`;
+  return `Next time: stay at ${fmtW(nx.w)} ${unit()}${nx.reason === 'max' ? '' : ` and aim for ${max} reps on every set`}.`;
+}
+
+// Shown under the sets once every set of the exercise is ticked.
+function doneCard(e, ex, recs) {
+  const a = state.active;
+  const done = e.sets.filter((s) => s.done);
+  const n = working(done).length;
+  const top = topSet(done, ex);
+  const vol = volumeOf(done);
+  const last = lastSession(e.exId, a.startedAt);
+  const lastVol = last ? volumeOf(last.e.sets) : 0;
+  const diff = vol && lastVol ? Math.round((vol / lastVol - 1) * 100) : null;
+  const nx = progression(ex, done, e.max, e.feel);
+  const all = a.exercises.every(isComplete);
+  return h`<section class="done-card" aria-labelledby="done-title">
+    <div class="dc-head">
+      <span class="dc-check">${icon('check')}</span>
+      <div class="dc-head-text">
+        <h2 class="dc-title" id="done-title">${ex.name} done</h2>
+        <p class="dc-sub">${n} ${n === 1 ? 'set' : 'sets'}${top ? `, best ${setText(top, ex)}` : ''}</p>
+      </div>
+    </div>
+    ${vol || recs.size ? h`<div class="dc-stats">
+      ${vol ? h`<div class="dc-stat"><b>${numFmt(toDisp(vol))}</b><span>${unit()} lifted</span></div>` : ''}
+      ${diff != null ? h`<div class="dc-stat ${diff > 0 ? 'up' : ''}"><b>${diff > 0 ? '+' : ''}${diff}%</b><span>vs last time</span></div>` : ''}
+      ${recs.size ? h`<div class="dc-stat pr"><b>${icon('trophy')} ${recs.size}</b><span>${recs.size === 1 ? 'new PR' : 'new PRs'}</span></div>` : ''}
+    </div>` : ''}
+    <div class="feel" role="group" aria-labelledby="feel-q">
+      <p class="feel-q" id="feel-q">How did that feel?</p>
+      <div class="feel-grid">${Object.entries(FEELS).map(([k, f]) => h`
+        <button class="feel-btn ${e.feel === k ? 'on' : ''}" data-act="feel" data-v="${k}" aria-pressed="${e.feel === k}">
+          <span class="feel-name">${f.name}</span><span class="feel-desc">${f.desc}</span>
+        </button>`)}</div>
+      ${nx ? h`<p class="feel-next">${nextText(nx, e.max)}</p>` : ''}
+    </div>
+    ${all ? h`<button class="btn primary big wide" data-act="finish">${icon('check')} Finish workout</button>` : ''}
+  </section>`;
+}
+
+// For the rest timer: the next set of this exercise, or the next exercise.
+function nextUp(entry) {
+  const ex = getEx(entry.exId, entry.name);
+  const i = entry.sets.findIndex((s) => !s.done);
+  if (i < 0) {
+    const nx = state.active.exercises.find((x) => !isComplete(x));
+    return nx ? `Next: ${getEx(nx.exId, nx.name).name}` : '';
+  }
+  const s = entry.sets[i];
+  const last = lastSession(entry.exId);
+  const ph = placeholders(entry, last ? working(last.e.sets) : [])[i];
+  const v = { w: s.w ?? ph.w, r: s.r ?? ph.r, s: s.s ?? ph.s };
+  const known = TRACKS[ex.track].fields.every((f) => v[f] != null || (f === 'w' && ex.track === 'bw'));
+  const label = s.wu ? 'warm-up set' : `set ${working(entry.sets.slice(0, i + 1)).length}`;
+  return `Next: ${label}${known ? `, ${setText(v, ex)}` : ''}`;
+}
+
+// Deletes a set, with Undo.
+function removeSet(entry, i) {
+  const [set] = entry.sets.splice(i, 1);
+  if (!set) return;
+  save('active');
+  app.refresh();
+  toast('Set deleted', {
+    action: 'Undo',
+    onAction() {
+      if (!state.active?.exercises.includes(entry)) return;
+      entry.sets.splice(Math.min(i, entry.sets.length), 0, set);
+      save('active');
+      app.refresh();
+    },
+  });
+}
+
+// Swipe a set row left to show Delete. A long swipe deletes it straight away.
+const REVEAL = 96;
+let swipeEndedAt = 0;
+
+function initSwipe(el, entry) {
+  let g = null;
+  el.onpointerdown = (ev) => {
+    const wrap = ev.target.closest('.set-swipe');
+    for (const o of el.querySelectorAll('.set-swipe.open')) if (o !== wrap) o.classList.remove('open');
+    g = wrap && ev.button === 0 && !ev.target.closest('.set-del')
+      ? { wrap, row: wrap.querySelector('.set-row'), id: ev.pointerId, x: ev.clientX, y: ev.clientY, base: wrap.classList.contains('open') ? -REVEAL : 0, dx: 0, on: false }
+      : null;
+  };
+  el.onpointermove = (ev) => {
+    if (!g || ev.pointerId !== g.id) return;
+    const dx = ev.clientX - g.x;
+    const dy = ev.clientY - g.y;
+    if (!g.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        g = null;
+        return;
+      }
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy)) return;
+      g.on = true;
+      if (g.wrap.contains(document.activeElement)) document.activeElement.blur();
+      getSelection()?.removeAllRanges();
+      g.wrap.classList.add('dragging');
+      g.wrap.setPointerCapture?.(ev.pointerId);
+    }
+    g.dx = Math.min(0, g.base + dx);
+    g.row.style.transform = `translateX(${g.dx}px)`;
+  };
+  el.onpointerup = el.onpointercancel = (ev) => {
+    if (!g || ev.pointerId !== g.id) return;
+    const { wrap, row, on, dx, base } = g;
+    g = null;
+    if (!on) {
+      if (base) wrap.classList.remove('open'); // a tap on an open row closes it
+      return;
+    }
+    swipeEndedAt = Date.now();
+    wrap.classList.remove('dragging');
+    row.style.transform = '';
+    if (ev.type === 'pointerup' && dx < -wrap.offsetWidth * 0.5) removeSet(entry, Number(wrap.dataset.si));
+    else wrap.classList.toggle('open', dx < -REVEAL / 2);
+  };
 }
 
 async function onLogClick(ev, entry) {
   const b = ev.target.closest('[data-act]');
-  if (!b) return;
+  if (!b || Date.now() - swipeEndedAt < 400) return;
   const act = b.dataset.act;
   if (act === 'check') return toggleCheck(b, entry);
+  if (act === 'delset') return removeSet(entry, Number(b.closest('[data-si]').dataset.si));
+  if (act === 'rmset') {
+    const i = entry.sets.findLastIndex((s) => !s.done);
+    return removeSet(entry, i < 0 ? entry.sets.length - 1 : i);
+  }
+  if (act === 'feel') {
+    entry.feel = entry.feel === b.dataset.v ? null : b.dataset.v;
+    save('active');
+    afterChange(entry);
+    return;
+  }
   if (['finish', 'discard', 'menu', 'rename'].includes(act)) return commonActions(act);
   if (act === 'exmenu') {
     if (await exerciseMenu(entry)) app.refresh();
@@ -344,6 +533,7 @@ async function onLogClick(ev, entry) {
     const r = await choiceSheet({ title: 'Rest between sets', value: entry.rest, options: REST_OPTIONS.map((x) => ({ value: x, label: restLabel(x) })) });
     if (r == null) return;
     entry.rest = r;
+    rememberRest(entry.exId, r);
   } else if (act === 'addset') {
     entry.sets.push({ w: null, r: null, s: null, done: false, wu: false });
   } else if (act === 'apply') {
@@ -352,7 +542,8 @@ async function onLogClick(ev, entry) {
     entry.sets.forEach((s) => { if (!s.done && !s.wu) s.w = sug.w; });
     toast(`Set to ${fmtW(sug.w)} ${unit()}. Change any set if it's too heavy.`);
   } else if (act === 'set') {
-    const set = entry.sets[Number(b.closest('[data-si]').dataset.si)];
+    const si = Number(b.closest('[data-si]').dataset.si);
+    const set = entry.sets[si];
     const v = await choiceSheet({
       title: 'Set options',
       options: [
@@ -360,8 +551,8 @@ async function onLogClick(ev, entry) {
         { value: 'del', label: 'Delete set', icon: 'trash', danger: true },
       ],
     });
+    if (v === 'del') return removeSet(entry, si);
     if (v === 'wu') set.wu = !set.wu;
-    else if (v === 'del') entry.sets.splice(entry.sets.indexOf(set), 1);
     else return;
   } else return;
   save('active');
@@ -454,6 +645,8 @@ async function finish() {
     ],
   });
   if (v !== 'save') return;
+  chime('finish');
+  haptic(30);
   for (const e of a.exercises) {
     const ex = getEx(e.exId, e.name);
     for (const s of e.sets) {

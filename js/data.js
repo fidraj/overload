@@ -59,6 +59,14 @@ export const GOALS = {
   endurance: { name: 'Endurance', desc: 'Lighter weight, 12–20+ reps, short rests.' },
 };
 
+// "How did that feel?" after an exercise. Feeds the next session's weight suggestion.
+export const FEELS = {
+  easy: { name: 'Easy', desc: 'Could do more', tag: 'Felt easy' },
+  right: { name: 'Just right', desc: 'Last reps were tough', tag: 'Felt just right' },
+  hard: { name: 'Hard', desc: 'Barely made it', tag: 'Felt hard' },
+  max: { name: 'Too much', desc: 'Missed reps', tag: 'Felt too heavy' },
+};
+
 // Tracking types: wr = weight × reps, bw = bodyweight reps (+ optional added weight),
 // r = reps only, t = time hold, wt = weight × time.
 // Columns: id | name | primary muscles | secondary muscles | equipment | c(ompound)/i(solation) | track | tier (3 = staple)

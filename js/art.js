@@ -104,7 +104,9 @@ export function muscleIcon(muscle, secondary = []) {
 
 // ---- Exercise pictograms --------------------------------------------------------------
 // 64×64 stick figures, mostly side view facing right. Body strokes use the ink colour,
-// weights use plate blue, benches and machines a muted tone.
+// weights use plate blue, benches and machines a muted tone. The weight in the hands is
+// drawn for the exercise's equipment: a plate for barbells (seen end-on), dumbbells,
+// kettlebells, a handle for cables, machines and bands, nothing for bodyweight.
 
 const P = (...pts) => {
   let d = '';
@@ -113,79 +115,107 @@ const P = (...pts) => {
 };
 const head = (x, y) => `<circle class="p-head" cx="${x}" cy="${y}" r="4.6"/>`;
 const plate = (x, y, r = 5.5) => `<circle class="p-plate" cx="${x}" cy="${y}" r="${r}"/>`;
-const db = (x1, y1, x2, y2) => `<path class="p-db" d="M${x1} ${y1}L${x2} ${y2}"/>`;
 const kit = (...parts) => `<g class="p-kit">${parts.join('')}</g>`;
 const cable = (...pts) => `<g class="p-cable">${P(...pts)}</g>`;
+const turn = (x, y, a) => `transform="translate(${x} ${y})${a ? ` rotate(${a})` : ''}"`;
+// A handle 10 long, centred on (x, y), turned by a degrees (0 = horizontal).
+const grip = (x, y, a = 0) => `<path class="p-grip" ${turn(x, y, a)} d="M-5 0H5"/>`;
+// Dumbbell: a short handle with a head at each end.
+const dbell = (x, y, a = 0) => `<g class="p-dbell" ${turn(x, y, a)}><path d="M-5 0H5"/><rect x="-8.2" y="-4.6" width="4.4" height="9.2" rx="1.4"/><rect x="3.8" y="-4.6" width="4.4" height="9.2" rx="1.4"/></g>`;
+// Kettlebell hanging from a hand at (x, y): handle on top, round bell below. a = 180 holds it bell-up.
+const kbell = (x, y, a = 0) => `<g class="p-kb" ${turn(x, y, a)}><path d="M-3.2 3.2V1a3.2 3.2 0 0 1 6.4 0v2.2"/><circle cy="7.6" r="4.9"/></g>`;
+
+// The weight held at (x, y) for load kind k. a turns dumbbells and handles; r sizes the plate.
+function W(k, x, y, { a = 0, r = 5.5, up = false } = {}) {
+  if (k === 'db') return dbell(x, y, a);
+  if (k === 'kb') return kbell(x, y, up ? 180 : a);
+  if (k === 'bb') return plate(x, y, r);
+  if (k === 'other') return grip(x, y, a);
+  return '';
+}
+
+const legs = (y) => P(29, y, 35, y) + P(29, y, 28, y + 19) + P(35, y, 36, y + 19);
 
 const PICTOS = {
-  bench: () => kit(P(8, 40, 46, 40), P(12, 40, 12, 52), P(42, 40, 42, 52))
-    + head(11, 31) + P(16, 34, 36, 35) + P(36, 35, 46, 28, 50, 46, 55, 46) + P(19, 34, 19, 19) + plate(19, 15),
-  incline: () => kit(P(14, 50, 34, 30), P(30, 44, 44, 44), P(36, 44, 36, 54))
-    + head(15, 22) + P(19, 28, 32, 40) + P(32, 40, 44, 38, 46, 53, 51, 53) + P(21, 29, 25, 13) + plate(25, 9),
-  fly: () => cable(5, 4, 15, 31) + cable(59, 4, 49, 31)
+  bench: (k) => kit(P(8, 40, 46, 40), P(12, 40, 12, 52), P(42, 40, 42, 52))
+    + head(11, 31) + P(16, 34, 36, 35) + P(36, 35, 46, 28, 50, 46, 55, 46) + P(19, 34, 19, 19) + W(k, 19, 15, { up: true }),
+  incline: (k) => kit(P(14, 50, 34, 30), P(30, 44, 44, 44), P(36, 44, 36, 54))
+    + head(15, 22) + P(19, 28, 32, 40) + P(32, 40, 44, 38, 46, 53, 51, 53) + P(21, 29, 25, 13) + W(k, 25, 9, { up: true }),
+  fly: (k) => (k === 'db' ? dbell(13, 31, 90) + dbell(51, 31, 90) : cable(5, 4, 15, 31) + cable(59, 4, 49, 31))
     + head(32, 12) + P(32, 18, 32, 37) + P(26, 21, 38, 21) + P(26, 21, 15, 31) + P(38, 21, 49, 31)
     + P(29, 37, 35, 37) + P(29, 37, 28, 58) + P(35, 37, 36, 58),
   pushup: () => head(51, 27) + P(45, 31, 25, 39, 8, 46) + P(8, 46, 5, 48) + P(44, 32, 45, 47),
   dip: () => kit(P(10, 36, 22, 36), P(42, 36, 54, 36), P(14, 36, 14, 60), P(50, 36, 50, 60))
     + head(32, 10) + P(32, 16, 32, 36) + P(25, 20, 39, 20) + P(25, 20, 20, 35) + P(39, 20, 44, 35)
     + P(29, 36, 35, 36) + P(29, 36, 28, 48, 31, 55) + P(35, 36, 36, 48, 33, 55),
-  press: () => kit(P(13, 8, 51, 8)) + plate(13, 8, 5) + plate(51, 8, 5)
-    + head(32, 17) + P(32, 23, 32, 41) + P(26, 25, 38, 25) + P(26, 25, 23, 9) + P(38, 25, 41, 9)
-    + P(29, 41, 35, 41) + P(29, 41, 28, 60) + P(35, 41, 36, 60),
-  raise: () => head(32, 13) + P(32, 19, 32, 38) + P(26, 22, 38, 22) + P(26, 22, 11, 22) + P(38, 22, 53, 22)
-    + db(9, 17, 9, 27) + db(55, 17, 55, 27)
-    + P(29, 38, 35, 38) + P(29, 38, 28, 59) + P(35, 38, 36, 59),
+  // Barbell overhead; dumbbells and kettlebells one per hand, elbows out.
+  press: (k) => (k === 'db' || k === 'kb'
+    ? head(32, 17) + P(26, 25, 15, 25, 15, 14) + P(38, 25, 49, 25, 49, 14) + W(k, 15, 10, { up: true }) + W(k, 49, 10, { up: true })
+    : kit(P(13, 8, 51, 8)) + plate(13, 8, 5) + plate(51, 8, 5) + head(32, 17) + P(26, 25, 23, 9) + P(38, 25, 41, 9))
+    + P(32, 23, 32, 41) + P(26, 25, 38, 25) + legs(41),
+  raise: (k) => head(32, 13) + P(32, 19, 32, 38) + P(26, 22, 38, 22) + P(26, 22, 11, 22) + P(38, 22, 53, 22)
+    + W(k, 8, 22, { a: 90 }) + W(k, 56, 22, { a: 90 })
+    + legs(38),
   pull_high: () => head(32, 15) + P(32, 21, 32, 40) + P(26, 23, 38, 23) + P(26, 23, 15, 19, 20, 9) + P(38, 23, 49, 19, 44, 9)
-    + db(17, 9, 23, 9) + db(41, 9, 47, 9)
-    + P(29, 40, 35, 40) + P(29, 40, 28, 60) + P(35, 40, 36, 60),
-  extension: () => head(37, 15) + P(31, 21, 31, 39) + P(31, 22, 29, 6, 19, 15) + db(15, 12, 22, 19)
+    + grip(20, 9) + grip(44, 9)
+    + legs(40),
+  extension: (k) => head(37, 15) + P(31, 21, 31, 39) + P(31, 22, 29, 6, 19, 15) + W(k, 18, 16, { a: 45 })
     + P(31, 39, 32, 49, 31, 59) + P(31, 59, 36, 59),
-  pushdown: () => cable(44, 2, 43, 36) + head(30, 10) + P(31, 16, 31, 35) + P(31, 18, 32, 29, 42, 36)
-    + P(31, 35, 32, 46, 31, 57) + P(31, 57, 36, 57),
-  curl: () => head(30, 10) + P(30, 16, 30, 35) + P(30, 18, 30, 29, 40, 22) + db(38, 18, 43, 25)
+  // Cable pushdown; with a dumbbell it's a bent-over kickback.
+  pushdown: (k) => (k === 'db'
+    ? head(51, 19) + P(45, 23, 24, 28) + P(24, 28, 29, 42, 26, 56) + P(26, 56, 31, 56) + P(43, 25, 36, 34, 18, 31) + dbell(15, 31, 90)
+    : cable(44, 2, 43, 36) + head(30, 10) + P(31, 16, 31, 35) + P(31, 18, 32, 29, 42, 36)
+      + P(31, 35, 32, 46, 31, 57) + P(31, 57, 36, 57)),
+  curl: (k) => head(30, 10) + P(30, 16, 30, 35) + P(30, 18, 30, 29, 40, 22) + W(k, 41, 21, { a: k === 'kb' ? 0 : 54 })
     + P(30, 35, 31, 46, 30, 57) + P(30, 57, 35, 57),
-  carry: () => head(32, 9) + P(32, 15, 32, 33) + P(32, 17, 33, 33) + db(33, 30, 33, 40)
-    + P(32, 33, 38, 44, 41, 56) + P(32, 33, 27, 44, 22, 54),
+  // Front view, a weight in each hand at the sides; a barbell hangs in front of the thighs.
+  carry: (k) => head(32, 9) + P(32, 15, 32, 35) + P(25, 18, 39, 18) + P(25, 18, 21, 34) + P(39, 18, 43, 34)
+    + (k === 'bb' ? `<path class="p-grip p-bar" d="M13 35H51"/>` + plate(12, 35, 5) + plate(52, 35, 5) : W(k, 20, k === 'kb' ? 33 : 38, { a: 90 }) + W(k, 44, k === 'kb' ? 33 : 38, { a: 90 }))
+    + P(29, 35, 35, 35) + P(29, 35, 28, 57) + P(35, 35, 36, 57),
   pullup: () => kit(P(10, 5, 54, 5))
     + head(32, 14) + P(32, 20, 32, 39) + P(26, 21, 38, 21) + P(26, 21, 19, 13, 23, 5) + P(38, 21, 45, 13, 41, 5)
     + P(29, 39, 35, 39) + P(29, 39, 29, 51, 26, 59) + P(35, 39, 35, 51, 38, 59),
   pulldown: () => cable(32, 2, 32, 11) + kit(P(10, 11, 54, 11), P(22, 44, 42, 44))
     + head(32, 22) + P(32, 28, 32, 47) + P(26, 30, 38, 30) + P(26, 30, 18, 21, 19, 11) + P(38, 30, 46, 21, 45, 11)
     + P(29, 47, 35, 47) + P(29, 47, 26, 60) + P(35, 47, 38, 60),
-  row: () => head(48, 17) + P(42, 21, 21, 31) + P(21, 31, 27, 43, 23, 55) + P(23, 55, 28, 55)
-    + P(40, 23, 31, 25, 35, 35) + plate(35, 37),
+  row: (k) => head(48, 17) + P(42, 21, 21, 31) + P(21, 31, 27, 43, 23, 55) + P(23, 55, 28, 55)
+    + P(40, 23, 31, 25, 35, 35) + W(k, 35, k === 'bb' ? 37 : k === 'kb' ? 34 : 38),
   seated_row: () => cable(42, 33, 60, 33) + kit(P(8, 47, 28, 47), P(50, 33, 50, 49))
     + head(18, 16) + P(18, 22, 20, 44) + P(20, 44, 34, 37, 46, 44) + P(19, 26, 40, 33),
-  deadlift: () => head(44, 15) + P(39, 20, 22, 30) + P(22, 30, 30, 41, 26, 54) + P(26, 54, 31, 54)
-    + P(37, 21, 37, 41) + plate(37, 46, 6.5),
-  squat: () => head(35, 12) + P(32, 18, 20, 36) + P(20, 36, 36, 41, 31, 56) + P(31, 56, 36, 56)
-    + P(31, 20, 38, 26, 30, 22) + plate(28, 20, 6),
-  lunge: () => head(32, 9) + P(32, 15, 32, 33) + P(32, 33, 44, 36, 44, 53) + P(44, 53, 49, 53)
-    + P(32, 33, 24, 49, 12, 47) + P(32, 17, 33, 33) + db(33, 31, 33, 40),
+  superman: () => head(14, 37) + P(19, 40, 38, 44) + P(38, 44, 58, 35) + P(20, 40, 5, 31),
+  deadlift: (k) => head(44, 15) + P(39, 20, 22, 30) + P(22, 30, 30, 41, 26, 54) + P(26, 54, 31, 54)
+    + P(37, 21, 37, 41) + W(k, 37, k === 'kb' ? 41 : 46, { r: 6.5 }),
+  // Barbell on the back; a dumbbell or kettlebell held at the chest (goblet); bodyweight arms forward.
+  squat: (k) => (k === 'db' || k === 'kb'
+    ? head(31, 10) + P(30, 16, 22, 35) + P(22, 35, 37, 40, 32, 56) + P(32, 56, 37, 56) + P(29, 19, 36, 30, 38, 25)
+      + (k === 'db' ? dbell(40, 22, 90) : kbell(40, 21, 180))
+    : head(35, 12) + P(32, 18, 20, 36) + P(20, 36, 36, 41, 31, 56) + P(31, 56, 36, 56)
+      + (k === 'none' ? P(31, 20, 46, 24) : P(31, 20, 38, 26, 30, 22) + plate(28, 20, 6))),
   leg_press: () => kit(P(8, 30, 22, 48), P(22, 48, 36, 48), P(50, 20, 54, 42))
     + head(11, 22) + P(14, 28, 26, 42) + P(26, 42, 34, 26, 49, 30) + P(16, 30, 26, 36),
+  lunge: (k) => head(32, 9) + P(32, 15, 32, 33) + P(32, 33, 44, 36, 44, 53) + P(44, 53, 49, 53)
+    + P(32, 33, 24, 49, 12, 47) + P(32, 17, 33, 36) + W(k, 33, k === 'kb' ? 34 : 39),
   leg_ext: () => kit(P(15, 40, 37, 40), P(15, 40, 15, 18), P(26, 40, 26, 56)) + plate(52, 32, 3.5)
     + head(22, 11) + P(22, 17, 22, 36) + P(22, 36, 36, 36, 50, 32) + P(22, 19, 27, 35),
   leg_curl: () => kit(P(6, 41, 46, 41), P(10, 41, 10, 54), P(42, 41, 42, 54)) + plate(9, 18, 3.5)
     + head(52, 32) + P(46, 35, 28, 37) + P(28, 37, 15, 37, 10, 22) + P(46, 36, 51, 44),
-  calf: () => kit(P(26, 57, 44, 57))
-    + head(32, 8) + P(32, 14, 32, 32) + P(32, 16, 33, 31) + db(33, 29, 33, 38)
+  calf: (k) => kit(P(26, 57, 44, 57))
+    + head(32, 8) + P(32, 14, 32, 32) + P(32, 16, 33, 31) + (k === 'db' || k === 'kb' ? W(k, 33, k === 'kb' ? 30 : 34) : '')
     + P(32, 32, 32, 44, 31, 51, 37, 55),
-  thrust: () => kit(P(5, 36, 17, 36), P(10, 36, 10, 52)) + plate(32, 23, 5.5)
+  thrust: (k) => kit(P(5, 36, 17, 36), P(10, 36, 10, 52)) + (k === 'bb' ? plate(32, 23, 5.5) : '')
     + head(9, 27) + P(14, 31, 32, 30) + P(32, 30, 44, 33, 44, 51) + P(44, 51, 50, 51),
   kickback: () => kit(P(50, 26, 50, 60))
     + head(42, 13) + P(38, 18, 27, 30) + P(36, 20, 49, 28) + P(27, 30, 29, 43, 28, 57) + P(28, 57, 33, 57)
     + P(27, 30, 15, 24, 6, 22),
-  swing: () => head(30, 11) + P(30, 17, 28, 35) + P(29, 19, 46, 23) + `<circle class="p-plate" cx="50" cy="25" r="4.5"/>`
+  swing: () => head(30, 11) + P(30, 17, 28, 35) + P(29, 19, 46, 23) + kbell(46, 23, -90)
     + P(28, 35, 34, 45, 30, 57) + P(30, 57, 35, 57),
   plank: () => head(52, 28) + P(46, 32, 26, 37, 8, 43) + P(8, 43, 5, 46) + P(45, 33, 45, 45, 54, 45),
   side_plank: () => head(49, 15) + P(44, 21, 8, 50) + P(44, 22, 45, 47) + P(44, 22, 43, 5) + P(8, 50, 4, 52),
   crunch: () => head(14, 25) + P(19, 30, 30, 45) + P(30, 45, 42, 33, 49, 47) + P(49, 47, 54, 47) + P(20, 31, 26, 24, 17, 22),
   leg_raise: () => kit(P(18, 4, 46, 4))
     + P(31, 4, 31, 19) + head(37, 15) + P(31, 19, 31, 37) + P(31, 37, 53, 37),
-  twist: () => plate(39, 32, 4.5) + head(19, 15) + P(21, 21, 29, 43) + P(29, 43, 41, 34, 52, 39)
+  twist: (k) => (k === 'db' ? dbell(39, 33, 90) : plate(39, 32, 4.5)) + head(19, 15) + P(21, 21, 29, 43) + P(29, 43, 41, 34, 52, 39)
     + P(22, 24, 30, 33, 37, 31),
-  superman: () => head(14, 37) + P(19, 40, 38, 44) + P(38, 44, 58, 35) + P(20, 40, 5, 31),
   abduction: () => kit(P(22, 37, 42, 37)) + `<circle class="p-plate" cx="13" cy="42" r="3.5"/><circle class="p-plate" cx="51" cy="42" r="3.5"/>`
     + head(32, 9) + P(32, 15, 32, 34) + P(26, 18, 38, 18) + P(26, 18, 24, 32) + P(38, 18, 40, 32)
     + P(29, 34, 35, 34) + P(29, 34, 17, 42, 21, 58) + P(35, 34, 47, 42, 43, 58),
@@ -222,7 +252,8 @@ const PICTO_BY_ID = {
   side_plank: 'side_plank copenhagen_plank',
   calf: 'standing_calf_raise seated_calf_raise db_calf_raise smith_calf_raise leg_press_calf_raise bw_calf_raise',
   plank: 'plank ab_wheel',
-  crunch: 'crunch cable_crunch machine_crunch dead_bug bicycle_crunch',
+  crunch: 'crunch cable_crunch machine_crunch dead_bug bicycle_crunch lying_leg_raise',
+  leg_raise: 'hanging_leg_raise',
   twist: 'russian_twist pallof_press cable_woodchop db_side_bend',
 };
 
@@ -237,12 +268,22 @@ const PICTO_FOR_MUSCLE = {
   adductors: 'abduction', abductors: 'abduction',
 };
 
+// What the hands hold: db, kb, bb (any bar), other (cable, machine, band) or none.
+export function loadKind(ex) {
+  const eq = ex.equipment || [];
+  if (eq.includes('dumbbell')) return 'db';
+  if (eq.includes('kettlebell')) return 'kb';
+  if (['barbell', 'ezbar', 'smith', 'trapbar'].some((e) => eq.includes(e))) return 'bb';
+  if (['cable', 'machine', 'band'].some((e) => eq.includes(e))) return 'other';
+  return 'none';
+}
+
 export const PICTO_KEYS = Object.keys(PICTOS);
 
-export function pictogram(key) {
-  return `<svg class="picto" viewBox="0 0 64 64" aria-hidden="true"><g class="p-body">${(PICTOS[key] || PICTOS.press)()}</g></svg>`;
+export function pictogram(key, kind = 'bb') {
+  return `<svg class="picto" viewBox="0 0 64 64" aria-hidden="true"><g class="p-body">${(PICTOS[key] || PICTOS.press)(kind)}</g></svg>`;
 }
 
 export function exerciseArt(ex) {
-  return pictogram(PICTO_FOR[ex.id] || ex.picto || PICTO_FOR_MUSCLE[ex.primary[0]] || 'press');
+  return pictogram(PICTO_FOR[ex.id] || ex.picto || PICTO_FOR_MUSCLE[ex.primary[0]] || 'press', loadKind(ex));
 }

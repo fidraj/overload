@@ -1,5 +1,6 @@
-// Rest timer, elapsed clock, end-of-rest alert and screen wake lock.
-// The dock (above the tab bar) shows the rest timer and a "resume workout" bar.
+// Rest timer, elapsed clock, end-of-rest alert, screen wake lock, and the sounds and taps
+// that confirm a set. The dock (above the tab bar) shows the rest timer and a "resume
+// workout" bar.
 
 import { state, save } from './store.js';
 import { h, icon, clock } from './ui.js';
@@ -33,14 +34,68 @@ function beep() {
   });
 }
 
+// Short rising notes: a soft tick for a set, a brighter run for a record or a finished
+// exercise, and a full arpeggio for a finished workout.
+const CHIMES = {
+  set: [[660, 0], [990, 0.06]],
+  pr: [[784, 0], [988, 0.08], [1319, 0.16]],
+  done: [[523, 0], [659, 0.09], [784, 0.18]],
+  finish: [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.3]],
+};
+
+export function chime(kind) {
+  if (!state.settings.sound) return;
+  unlockAudio();
+  if (!audio) return;
+  if (audio.state === 'suspended') audio.resume();
+  const t0 = audio.currentTime + 0.01;
+  for (const [freq, d] of CHIMES[kind] || CHIMES.set) {
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t0 + d);
+    gain.gain.exponentialRampToValueAtTime(kind === 'set' ? 0.12 : 0.16, t0 + d + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.22);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(t0 + d);
+    osc.stop(t0 + d + 0.25);
+  }
+}
+
+// A short tap. Android vibrates. iPhones (iOS 18+) tick when a switch control is toggled,
+// so toggle a hidden one; that only works inside a tap handler.
+export function haptic(ms = 12) {
+  if (!state.settings.vibrate) return;
+  if (navigator.vibrate) {
+    navigator.vibrate(ms);
+    return;
+  }
+  try {
+    const label = document.createElement('label');
+    label.ariaHidden = 'true';
+    label.style.display = 'none';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    label.append(input);
+    document.head.append(label);
+    label.click();
+    label.remove();
+  } catch {
+    // No haptics here.
+  }
+}
+
 function alarm() {
   if (state.settings.sound) beep();
   if (state.settings.vibrate && navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
-export function startRest(sec) {
+// next: what's up after the rest, e.g. "Next: set 3, 60 kg × 8".
+export function startRest(sec, next = '') {
   if (!state.active || !(sec > 0)) return;
-  state.active.rest = { endsAt: Date.now() + sec * 1000, total: sec, alerted: false };
+  state.active.rest = { endsAt: Date.now() + sec * 1000, total: sec, alerted: false, next };
   save('active');
   renderDock();
 }
@@ -55,7 +110,7 @@ function adjustRest(delta) {
   tick();
 }
 
-function stopRest() {
+export function stopRest() {
   if (!state.active) return;
   state.active.rest = null;
   save('active');
@@ -80,6 +135,7 @@ export function renderDock() {
           <button class="btn small" data-rest-act="15" aria-label="15 seconds more">+15</button>
           <button class="btn small" data-rest-act="skip">Skip</button>
         </div>
+        ${a.rest.next ? h`<p class="rest-next">${a.rest.next}</p>` : ''}
       </div>`);
   }
   if (a && !onWorkout) {

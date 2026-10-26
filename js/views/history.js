@@ -1,10 +1,10 @@
 // History tab: past workouts, workout detail with editing.
 
-import { TRACKS } from '../data.js';
+import { TRACKS, FEELS } from '../data.js';
 import { state, save, getEx, fmtW, fromDisp, unit, toDisp, sortHistory } from '../store.js';
 import { workoutStats, itemFromEntry, startWorkout, saveTemplate } from '../engine.js';
 import {
-  h, icon, app, confirmSheet, promptSheet, toast, setText, dateTime, durationText, numFmt, startOfDay,
+  h, icon, app, confirmSheet, promptSheet, toast, setText, dateTime, durationText, numFmt, startOfDay, ago,
 } from '../ui.js';
 import { thumb } from '../components.js';
 import { shareWorkout } from '../share.js';
@@ -111,20 +111,20 @@ export function renderHistoryDetail(el, id, flag) {
   const st = workoutStats(w);
   const recs = new Map((w.records || []).map((r) => [r.exId, r]));
 
+  const done = flag === 'done';
+
   el.innerHTML = String(h`
-    <a class="back" href="#/history">${icon('back')} History</a>
-    ${flag === 'done' ? h`<div class="done-banner" role="status">
-      <b>Workout saved.</b> ${recs.size ? `${recs.size} new ${recs.size === 1 ? 'record' : 'records'}.` : 'Next time, try to beat these numbers.'}
-    </div>` : ''}
+    ${done ? finishHead(w, st) : h`<a class="back" href="#/history">${icon('back')} History</a>
     <header class="detail-head">
       <h1 class="page-title">${w.name}</h1>
       <p class="muted">${dateTime(w.startedAt)}</p>
-    </header>
+    </header>`}
     <div class="stat-row">
       <div class="stat"><b>${durationText(st.duration)}</b><span>duration</span></div>
       <div class="stat"><b>${st.sets}</b><span>sets</span></div>
       <div class="stat"><b>${numFmt(toDisp(st.volume))}</b><span>${unit()} lifted</span></div>
     </div>
+    ${done ? finishNotes(w, st) : ''}
     ${w.exercises.map((e, ei) => {
       const ex = getEx(e.exId, e.name);
       const rec = recs.get(e.exId);
@@ -132,7 +132,8 @@ export function renderHistoryDetail(el, id, flag) {
       return h`<section class="hd-ex">
         <a class="hd-head" href="#/exercise/${ex.id}">${thumb(ex, 'small')}
           <span class="hd-head-text"><span class="hd-name">${ex.name}</span>
-          ${rec ? h`<span class="rec-badge">${icon('trophy')} ${recordText(rec)}</span>` : ''}</span></a>
+          ${rec ? h`<span class="rec-badge">${icon('trophy')} ${recordText(rec)}</span>` : ''}
+          ${FEELS[e.feel] ? h`<span class="feel-tag">${FEELS[e.feel].tag}</span>` : ''}</span></a>
         <ol class="hd-sets">${e.sets.map((s, si) => {
           const label = s.wu ? 'W' : String(++n);
           return isEditing ? editRow(ex, s, ei, si, label) : h`<li><span class="hd-n">${label}</span>${setText(s, ex)}</li>`;
@@ -147,7 +148,8 @@ export function renderHistoryDetail(el, id, flag) {
         <button class="btn" data-act="share">${icon('share')} Share</button>
         <button class="btn" data-act="edit">${icon('edit')} Edit</button>
         <button class="btn ghost-danger" data-act="delete">${icon('trash')} Delete</button>`}
-    </div>`);
+    </div>
+    ${done && !isEditing ? h`<div class="cta-bar pin"><a class="btn primary big" href="#/">${icon('check')} Done</a></div>` : ''}`);
 
   el.onclick = async (ev) => {
     const b = ev.target.closest('[data-act]');
@@ -201,6 +203,38 @@ export function renderHistoryDetail(el, id, flag) {
     s[f] = v == null ? null : f === 'w' ? fromDisp(v) : Math.round(v);
     save('history');
   };
+}
+
+// ---- Finished workout ---------------------------------------------------------------
+
+const BURST = 14;
+
+function finishHead(w, st) {
+  return h`<header class="finish">
+    <div class="burst" aria-hidden="true">
+      ${Array.from({ length: BURST }, (_, i) => h`<i class="b${i % 4}" style="--a:${Math.round((i * 360) / BURST)}deg;--d:${i % 2 ? 46 : 60}px"></i>`)}
+      <span class="burst-core">${icon('check')}</span>
+    </div>
+    <h1 class="display finish-title">Workout done</h1>
+    <p class="finish-sub">${w.name}, ${durationText(st.duration)}</p>
+  </header>`;
+}
+
+const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
+
+// Volume compared with the last time you did this workout, records, and this week's count.
+function finishNotes(w, st) {
+  const prev = state.history.find((x) => x.name === w.name && x.startedAt < w.startedAt);
+  const prevVol = prev ? workoutStats(prev).volume : 0;
+  const diff = st.volume && prevVol ? Math.round((st.volume / prevVol - 1) * 100) : null;
+  const week = state.history.filter((x) => x.startedAt >= mondayOf(w.startedAt) && x.startedAt <= w.startedAt).length;
+  return h`<ul class="finish-notes">
+    ${diff != null ? h`<li class="${diff > 0 ? 'up' : ''}">${icon(diff >= 0 ? 'up' : 'down')}
+      <span><b>${diff > 0 ? '+' : ''}${diff}% volume</b> compared with your last ${w.name}, ${ago(prev.startedAt)}</span></li>` : ''}
+    ${(w.records || []).map((r) => h`<li class="rec">${icon('trophy')}
+      <span><b>${getEx(r.exId).name}</b>: ${recordText(r)}</span></li>`)}
+    <li>${icon('history')} <span>Your ${ordinal(week)} workout this week</span></li>
+  </ul>`;
 }
 
 function editRow(ex, s, ei, si, label) {

@@ -4,6 +4,8 @@ import { EQUIPMENT, EQUIPMENT_PRESETS } from '../data.js';
 import { state, save, flush, exportData, replaceAll, eraseAll, getEx, fmtW, unit } from '../store.js';
 import { h, icon, app, confirmSheet, toast, download } from '../ui.js';
 import { initAnalytics, hasAnalytics } from '../analytics.js';
+import { restFor } from '../engine.js';
+import { REST_OPTIONS, restLabel } from './today.js';
 
 export function renderSettings(el) {
   const s = state.settings;
@@ -31,9 +33,15 @@ export function renderSettings(el) {
 
     <section class="set-group">
       <h2 class="section-title">Rest timer</h2>
+      <label class="field"><span class="field-label">Rest between sets</span>
+        <select class="text-in" data-rest>
+          <option value="auto" ${s.rest === 'auto' ? 'selected' : ''}>Based on your goal</option>
+          ${REST_OPTIONS.filter(Boolean).map((r) => h`<option value="${r}" ${r === s.rest ? 'selected' : ''}>${restLabel(r)}</option>`)}
+        </select>
+        <span class="field-hint">Exercises where you changed the rest yourself keep that rest.</span></label>
       ${toggle('autoRest', 'Start the rest timer when you tick a set', s.autoRest)}
-      ${toggle('sound', 'Beep when rest is over', s.sound)}
-      ${toggle('vibrate', 'Vibrate when rest is over (Android)', s.vibrate)}
+      ${toggle('sound', 'Sounds when you tick a set and when rest is over', s.sound)}
+      ${toggle('vibrate', 'Vibrate when you tick a set and when rest is over', s.vibrate, 'iPhones (iOS 18 and later) vibrate on ticks only.')}
       ${toggle('wakeLock', 'Keep the screen on during a workout', s.wakeLock)}
     </section>
 
@@ -107,6 +115,16 @@ export function renderSettings(el) {
       if (tg.dataset.toggle === 'analytics' && tg.checked) initAnalytics();
       return;
     }
+    const rs = e.target.closest('[data-rest]');
+    if (rs) {
+      s.rest = rs.value === 'auto' ? 'auto' : Number(rs.value);
+      save('settings');
+      if (state.draft) {
+        for (const it of state.draft.items) it.rest = restFor(it.exId, state.draft.goal);
+        save('draft');
+      }
+      return;
+    }
     const inc2 = e.target.closest('[data-inc]');
     if (inc2) {
       const v = Number(inc2.value.replace(',', '.'));
@@ -144,8 +162,9 @@ function seg(key, label, value, options) {
       <button class="seg-btn ${value === v ? 'on' : ''}" data-seg="${key}" data-v="${v}" aria-pressed="${value === v}">${name}</button>`)}</div></div>`;
 }
 
-function toggle(key, label, on) {
-  return h`<label class="switch-row"><span>${label}</span><input type="checkbox" class="switch" data-toggle="${key}" ${on ? 'checked' : ''}></label>`;
+function toggle(key, label, on, hint = '') {
+  return h`<label class="switch-row"><span class="switch-text"><span>${label}</span>${hint ? h`<span class="field-hint">${hint}</span>` : ''}</span>
+    <input type="checkbox" class="switch" data-toggle="${key}" ${on ? 'checked' : ''}></label>`;
 }
 
 function incField(key, label, v) {

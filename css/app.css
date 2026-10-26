@@ -31,6 +31,10 @@
   --tabs-h: 62px;
   --dock-h: 0px;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  /* Behind the iPhone status bar in the home screen app. Its text is always white there. */
+  --status-bg: #1c1f24;
+  --toast-action: #9dbcff;
   --gutter: 16px;
   color-scheme: light;
 }
@@ -59,6 +63,7 @@
     --map-muscle: #4b535e;
     --map-sec: #3d5274;
     --tile: #30353d;
+    --toast-action: #1f55c0;
     color-scheme: dark;
   }
 }
@@ -86,6 +91,7 @@
   --map-muscle: #4b535e;
   --map-sec: #3d5274;
   --tile: #30353d;
+  --toast-action: #1f55c0;
   color-scheme: dark;
 }
 
@@ -105,6 +111,27 @@ body {
 }
 
 body.sheet-open { overflow: hidden; }
+
+/* Status bar backdrop: content scrolls under it instead of under the clock. Zero height in a browser tab. */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  height: var(--safe-t);
+  background: var(--status-bg);
+  pointer-events: none;
+}
+
+/* Home screen app: no rubber-band bounce of the whole page. */
+@media (display-mode: standalone) {
+  html, body { overscroll-behavior-y: none; }
+}
+
+/* Keyboard up on a phone: bars pinned to the bottom get out of the way. */
+body.typing #tabs, body.typing #dock, body.typing .cta-bar.pin { display: none; }
 
 h1, h2, h3, p, ol, ul, figure { margin: 0; }
 ol, ul { padding: 0; list-style: none; }
@@ -132,8 +159,9 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 #view {
   max-width: 600px;
   margin: 0 auto;
-  padding: 16px var(--gutter) calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 40px);
+  padding: calc(16px + var(--safe-t)) var(--gutter) calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 40px);
 }
+#view:has(.cta-bar.pin) { padding-bottom: calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 120px); }
 
 /* ---- Type ----------------------------------------------------------------------- */
 
@@ -177,7 +205,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .picto .p-body { fill: none; stroke: var(--ink); stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; }
 .picto .p-head { fill: var(--ink); stroke: none; }
 .picto .p-plate { fill: var(--blue); stroke: none; }
-.picto .p-db { stroke: var(--blue); stroke-width: 5; }
+.picto .p-grip { stroke: var(--blue); stroke-width: 5; }
+.picto .p-bar { stroke-width: 2.6; }
+.picto .p-dbell path { stroke: var(--blue); stroke-width: 2.6; }
+.picto .p-dbell rect, .picto .p-kb circle { fill: var(--blue); stroke: none; }
+.picto .p-kb path { fill: none; stroke: var(--blue); stroke-width: 2.2; }
 .picto .p-kit { stroke: var(--ink-3); stroke-width: 3; }
 .picto .p-cable { stroke: var(--ink-3); stroke-width: 1.4; }
 
@@ -358,6 +390,18 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 }
 .up-note .i { width: 15px; height: 15px; }
 .up-note.big { display: flex; border-radius: 12px; padding: 8px 12px; margin-top: 10px; font-size: 14px; }
+.up-note.down { background: var(--surface-3); color: var(--ink-2); }
+.feel-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 650;
+  vertical-align: 1px;
+}
+.card .feel-tag { margin-top: 10px; }
 
 /* Exercise list rows (plan, workout overview) */
 .ex-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
@@ -475,6 +519,15 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
   padding: 16px var(--gutter) 12px;
   background: linear-gradient(to bottom, transparent, var(--bg) 24%);
 }
+/* Pinned: always at the bottom of the screen, above the tab bar and rest timer. */
+.cta-bar.pin {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  max-width: 600px;
+  margin: 0 auto;
+}
 .cta-bar .btn.primary, .cta-bar .next-btn { flex: 1; min-width: 0; }
 .cta-bar .btn.primary { overflow: hidden; text-overflow: ellipsis; }
 
@@ -515,13 +568,13 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 
 .wk-head {
   position: sticky;
-  top: 0;
+  top: var(--safe-t);
   z-index: 6;
   display: flex;
   align-items: center;
   gap: 6px;
   margin: -16px calc(-1 * var(--gutter)) 14px;
-  padding: calc(10px + env(safe-area-inset-top, 0px)) var(--gutter) 10px;
+  padding: 10px var(--gutter);
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
@@ -570,6 +623,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
   font-weight: 700;
 }
 .up-chip .i { width: 18px; height: 18px; }
+.up-chip.down { background: var(--surface-3); color: var(--ink); }
 
 .sets { display: grid; gap: 8px; }
 .set-row {
@@ -618,7 +672,117 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .set-check .i { width: 26px; height: 26px; }
 .done .set-check { background: var(--green); border-color: var(--green); color: #fff; }
 .done .set-in { background: var(--green-soft); border-color: transparent; }
-.sets + .add-row { margin-top: 10px; }
+
+/* Ticking a set: the check pops and draws itself, a ring pulses out, the fields flash green. */
+.just-done .set-check { animation: tick-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1), tick-ring 0.7s ease-out; }
+.just-done .set-check path { stroke-dasharray: 21; animation: tick-draw 0.32s 0.05s ease-out both; }
+.just-done .set-in { animation: tick-flash 0.8s ease-out; }
+@keyframes tick-pop { 0% { transform: scale(0.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes tick-ring {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 60%, transparent); }
+  to { box-shadow: 0 0 0 12px color-mix(in srgb, var(--green) 0%, transparent); }
+}
+@keyframes tick-draw { from { stroke-dashoffset: 21; } to { stroke-dashoffset: 0; } }
+@keyframes tick-flash { from { background: color-mix(in srgb, var(--green) 45%, var(--surface)); } }
+
+.set-pr {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 9px 2px 6px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #2a2000;
+  font-size: 13px;
+  font-weight: 750;
+  animation: tick-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.set-pr .i { width: 14px; height: 14px; }
+
+/* Swipe a set left to reveal Delete. */
+.set-swipe { position: relative; touch-action: pan-y; }
+.set-swipe .set-row { position: relative; transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.set-swipe.dragging .set-row { transition: none; }
+.set-swipe.open .set-row { transform: translateX(-96px); }
+.set-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 88px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--red);
+  color: #fff;
+  font-weight: 700;
+  visibility: hidden;
+}
+.set-del .i { width: 18px; height: 18px; }
+.set-swipe.open .set-del, .set-swipe.dragging .set-del { visibility: visible; }
+
+.set-actions { display: flex; gap: 8px; margin-top: 10px; }
+.set-actions .add-row { flex: 1; width: auto; margin: 0; }
+.set-actions .add-row + .add-row { flex: none; padding: 0 18px; }
+
+/* Shown once every set of an exercise is ticked. */
+.done-card {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1.5px solid var(--green);
+  border-radius: 18px;
+  background: var(--surface);
+  scroll-margin-bottom: calc(var(--tabs-h) + var(--dock-h) + var(--safe-b) + 110px);
+}
+.done-card.enter { animation: card-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.15) both; }
+.done-card.enter .dc-check { animation: tick-pop 0.5s 0.15s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes card-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+.dc-head { display: flex; align-items: center; gap: 12px; }
+.dc-check {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+}
+.dc-check .i { width: 26px; height: 26px; stroke-width: 2.6; }
+.dc-head-text { min-width: 0; }
+.dc-title { font: 800 26px/1 var(--font-num); overflow-wrap: anywhere; }
+.dc-sub { margin-top: 3px; font-size: 14px; color: var(--ink-2); }
+.dc-stats { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 14px; }
+.dc-stat { display: flex; flex-direction: column; }
+.dc-stat b { display: flex; align-items: center; gap: 4px; font: 800 26px/1.05 var(--font-num); font-variant-numeric: tabular-nums; }
+.dc-stat span { font-size: 13px; color: var(--ink-3); }
+.dc-stat.up b { color: var(--green); }
+.dc-stat.pr b .i { width: 20px; height: 20px; color: var(--yellow); }
+.done-card > .btn { margin-top: 14px; }
+
+.feel { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.feel-q { margin-bottom: 10px; font-weight: 700; }
+.feel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.feel-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+  text-align: left;
+}
+.feel-btn:hover { border-color: var(--ink-3); }
+.feel-btn.on { border-color: var(--blue); background: var(--blue-soft); }
+.feel-name { font-weight: 700; }
+.feel-desc { font-size: 13px; color: var(--ink-3); }
+.feel-btn.on .feel-desc { color: var(--ink-2); }
+.feel-next { margin-top: 12px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 
 .log-nav { margin-top: 18px; }
 .next-btn { justify-content: flex-start; gap: 10px; padding: 0 14px 0 18px; }
@@ -654,6 +818,16 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .rest-time { flex: 1; font: 800 34px/1 var(--font-num); font-variant-numeric: tabular-nums; }
 .rest.over .rest-time { color: var(--green); }
 .rest.over .rest-bar i { background: var(--green); }
+.rest-next {
+  margin-top: -2px;
+  padding: 0 14px 10px;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .resume {
   display: flex;
@@ -749,12 +923,48 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 .hi-rec { display: inline-flex; align-items: center; gap: 3px; color: var(--ink-2); font-weight: 650; }
 .hi-rec .i { width: 15px; height: 15px; color: var(--yellow); }
 
-.done-banner {
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  background: var(--green-soft);
+/* Finished workout: one burst of plate colours around a check. */
+.finish { padding-top: 4px; text-align: center; }
+.burst { position: relative; display: grid; place-items: center; width: 136px; height: 136px; margin: 0 auto; }
+.burst-core {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  animation: tick-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
+.burst-core .i { width: 40px; height: 40px; stroke-width: 2.6; }
+.burst i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 16px;
+  margin: -8px 0 0 -4px;
+  border-radius: 3px;
+  opacity: 0;
+  animation: burst 0.9s 0.12s cubic-bezier(0.15, 0.8, 0.3, 1) both;
+}
+.burst .b0 { background: var(--blue); }
+.burst .b1 { background: var(--yellow); }
+.burst .b2 { background: var(--green); }
+.burst .b3 { background: var(--red); }
+@keyframes burst {
+  0% { opacity: 1; transform: rotate(var(--a)) translateY(-30px) scale(0.4); }
+  65% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(1); }
+}
+.finish-title { margin: 6px 0 2px; }
+.finish-sub { margin-bottom: 18px; color: var(--ink-2); }
+.finish-notes { display: grid; gap: 8px; margin: 10px 0 4px; }
+.finish-notes li { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--surface); font-size: 15px; }
+.finish-notes .i { margin-top: 1px; color: var(--ink-3); }
+.finish-notes .up .i { color: var(--green); }
+.finish-notes .rec { background: var(--yellow-soft); color: var(--yellow-ink); }
+.finish-notes .rec .i { color: currentColor; }
 
 .hd-ex { margin-top: 10px; padding: 10px 14px 8px 10px; border-radius: 18px; background: var(--surface); }
 .hd-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; color: inherit; text-decoration: none; }
@@ -786,7 +996,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-app
 
 .lib-tools {
   position: sticky;
-  top: 0;
+  top: var(--safe-t);
   z-index: 4;
   margin: 0 calc(-1 * var(--gutter));
   padding: 8px var(--gutter) 0;
@@ -888,6 +1098,7 @@ select.text-in { appearance: none; background-image: linear-gradient(45deg, tran
 .set-group > .muted { font-size: 14px; margin-bottom: 8px; }
 .set-group .chip-wrap { margin-top: 4px; }
 
+.switch-text { display: flex; flex-direction: column; gap: 2px; }
 .switch-row {
   display: flex;
   align-items: center;
@@ -1086,6 +1297,9 @@ select.text-in { appearance: none; background-image: linear-gradient(45deg, tran
 }
 body.sheet-open #toast-root { top: calc(env(safe-area-inset-top, 0px) + 16px); bottom: auto; }
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   max-width: 480px;
   padding: 12px 18px;
   border-radius: 12px;
@@ -1094,6 +1308,15 @@ body.sheet-open #toast-root { top: calc(env(safe-area-inset-top, 0px) + 16px); b
   font-size: 15px;
   font-weight: 500;
   box-shadow: var(--shadow);
+}
+.toast-btn {
+  margin: -8px -8px -8px 0;
+  padding: 8px;
+  border: 0;
+  background: none;
+  color: var(--toast-action);
+  font-weight: 750;
+  pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
